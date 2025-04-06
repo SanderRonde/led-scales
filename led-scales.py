@@ -9,6 +9,7 @@
 import math
 import subprocess
 import sys
+import os
 from enum import Enum
 from typing import Dict, Tuple, List, Union
 
@@ -31,10 +32,9 @@ y_count = 12
 
 # Panel counts
 panel_count = 3
-panel_spacing = 80
 
-# LED
-led_diameter = 10
+# LED - not really but easier to drill
+led_diameter = 3
 
 # Weight and price
 estimated_weight_g = 23 / 2
@@ -102,7 +102,7 @@ def scale(mode: Mode, distance: float):
         return scale_3d(distance)
 
 
-def draw_panel(mode: Mode, scale_x_offset: int, scale_y_offset: int):
+def draw_panel(mode: Mode, scale_x_offset: int):
     coordinate_map: Dict[Tuple[int, int], float] = {}
 
     panel = ops.Union()
@@ -110,8 +110,7 @@ def draw_panel(mode: Mode, scale_x_offset: int, scale_y_offset: int):
     y_half = math.floor(y_count / 2)
     for _i in range(-x_half, x_half):
         i = _i + scale_x_offset
-        for _j in range(-y_half, y_half):
-            j = _j + scale_y_offset
+        for j in range(-y_half, y_half):
             distance: float = math.sqrt(i*i + j*j) * spacing
 
             coordinate_map[(i, j)] = distance
@@ -123,26 +122,35 @@ def draw_panel(mode: Mode, scale_x_offset: int, scale_y_offset: int):
     return (panel, coordinate_map)
 
 
-total_width = (x_count + 1) * spacing * panel_count + \
-    (panel_spacing * (panel_count - 1))
-total_height = (y_count + 1) * spacing
+total_width = (x_count) * spacing * panel_count + \
+    (spacing * (panel_count - 1))
+total_height = (y_count + 0.5) * spacing
 
 
 def draw(mode: Mode):
     joined_coordinate_map: Dict[Tuple[int, int], float] = {}
 
     result = ops.Union()
-    (panel, coordinate_map) = draw_panel(mode, 0, 0)
-    result.append(panel)
-    joined_coordinate_map.update(coordinate_map)
+    panels: List[ops.Union] = []
+    (center_panel, center_coordinate_map) = draw_panel(mode, 0)
+    joined_coordinate_map.update(center_coordinate_map)
+    panels.append(center_panel)
+    result.append(center_panel)
+
     for i in range(1, math.floor((panel_count - 1) / 2) + 1):
-        (panel, coordinate_map) = draw_panel(mode, i * x_count + 1, 0)
-        result.append(panel)
-        joined_coordinate_map.update(coordinate_map)
-        (panel, coordinate_map) = draw_panel(mode, -(i * x_count) - 1, 0)
-        result.append(panel)
-        joined_coordinate_map.update(coordinate_map)
-    return (result, joined_coordinate_map)
+        left_offset = i * x_count + 1
+        (left_panel, left_coordinate_map) = draw_panel(mode, left_offset)
+        panels.append(left_panel.translate([left_offset * spacing, 0, 0]))
+        result.append(left_panel)
+        joined_coordinate_map.update(left_coordinate_map)
+
+        right_offset = -(i * x_count) - 1
+        (right_panel, right_coordinate_map) = draw_panel(mode, right_offset)
+        panels.append(right_panel.translate([right_offset * spacing, 0, 0]))
+        result.append(right_panel)
+        joined_coordinate_map.update(right_coordinate_map)
+
+    return (result, joined_coordinate_map, panels)
 
 
 def x_offset_for_lean(lean: float):
@@ -153,7 +161,7 @@ def x_offset_for_lean(lean: float):
     return b
 
 
-def get_optimal_panel_x(distance_values: List[float], y_per_build_plate: int, total_max_lean: float):
+def get_optimal_tile_x(distance_values: List[float], y_per_build_plate: int, total_max_lean: float):
     max_lean = 0
     for d in distance_values:
         max_lean = max(max_lean, lean_angle(d))
@@ -192,26 +200,26 @@ def printable(coordinate_map: Dict[Tuple[int, int], float], mode: Mode, preview:
         y_per_build_plate = y_per_build_plate_override
 
     total_count = 0
-    panel_count = 0
-    panels: List[ops.Union] = list()
+    tile_count = 0
+    tiles: List[ops.Union] = list()
     while True:
-        panel = ops.Union()
-        panels.append(panel)
-        result.append(panel)
+        tile = ops.Union()
+        tiles.append(tile)
+        result.append(tile)
 
         max_lean = 0
         for _, d in distance_items:
             max_lean = max(max_lean, lean_angle(d))
 
-        panel_offset = panel_count * print_bed_spacing
-        (max_x_offset, x_per_build_plate) = get_optimal_panel_x(
+        tile_offset = tile_count * print_bed_spacing
+        (max_x_offset, x_per_build_plate) = get_optimal_tile_x(
             [d for _, d in distance_items[total_count:]], y_per_build_plate, max_lean)
         if x_per_build_plate_override is not None:
             x_per_build_plate = x_per_build_plate_override
 
         if preview and mode != Mode.POSITIONING:
             result.append(ops.Cube([x_print_bed, y_print_bed, 1]).translate(
-                [panel_offset, 0, 0]).translate([
+                [tile_offset, 0, 0]).translate([
                     -scale_small_side_length,
                     -scale_small_side_length,
                     0
@@ -220,13 +228,13 @@ def printable(coordinate_map: Dict[Tuple[int, int], float], mode: Mode, preview:
         for x in range(x_per_build_plate):
             for y in range(y_per_build_plate):
                 if total_count >= len(distance_items):
-                    return (result, panels)
+                    return (result, tiles)
 
                 key, d = distance_items[total_count]
                 translate_x = max_x_offset + \
-                    panel_offset + (x * x_print_spacing)
+                    tile_offset + (x * x_print_spacing)
                 translate_y = y * y_print_spacing
-                panel.append(scale(mode, d).translate(
+                tile.append(scale(mode, d).translate(
                     [translate_x, translate_y, 0]))
 
                 if mode == Mode.POSITIONING:
@@ -236,17 +244,17 @@ def printable(coordinate_map: Dict[Tuple[int, int], float], mode: Mode, preview:
                     result.append(text)
 
                 total_count += 1
-        panel_count += 1
+        tile_count += 1
 
 
 def main(mode: Mode, preview: bool = False):
-    (result, coordinate_map) = draw(mode)
+    (result, coordinate_map, _) = draw(mode)
     if mode != Mode.PRINT and mode != Mode.POSITIONING:
         return result
-    (printable_result, panels) = printable(coordinate_map, mode, preview)
+    (printable_result, tiles) = printable(coordinate_map, mode, preview)
     if not preview:
         printable_result = printable_result - ops.Cube([
-            (print_bed_spacing * len(panels)) * 1.5,
+            (print_bed_spacing * len(tiles)) * 1.5,
             total_height * 1.5,
             base_height * 1.5
         ]).translate([(-total_width / 2) * 1.5, (-total_height / 2) * 1.5, -base_height * 1.5])
@@ -254,19 +262,28 @@ def main(mode: Mode, preview: bool = False):
 
 
 def to_stls(file_name: str):
-    (_result, coordinate_map) = draw(Mode.PRINT)
-    (_result, panels) = printable(coordinate_map, Mode.PRINT, False)
-    for i in range(len(panels)):
+    (_result, coordinate_map, _) = draw(Mode.PRINT)
+    (_result, tiles) = printable(coordinate_map, Mode.PRINT, False)
+    for i in range(len(tiles)):
         negative = ops.Cube([
-            (print_bed_spacing * len(panels)) * 3,
+            (print_bed_spacing * len(tiles)) * 3,
             total_height * 1.5,
             base_height * 1.5
         ]).translate([(-total_width / 2) * 1.5, (-total_height / 2) * 1.5, -base_height * 1.5])
-        panel_out_path = "{}-{}.scad".format(file_name, i)
-        (panels[i] - negative).write(panel_out_path)
-        print(panel_out_path)
+        tile_out_path = "{}-{}.scad".format(file_name, i)
+        (tiles[i] - negative).write(tile_out_path)
         if "--stl" in sys.argv:
             subprocess.run([scad_path, "-o", "{}-{}.stl".format(file_name,
+                                                                i), tile_out_path])
+
+
+def to_panel_svgs(file_name: str):
+    (_result, _coordinate_map, panels) = draw(Mode.TWO_D)
+    for i in range(len(panels)):
+        panel_out_path = "{}-{}.scad".format(file_name, i)
+        panels[i].write(panel_out_path)
+        if "--svg" in sys.argv:
+            subprocess.run([scad_path, "-o", "{}-{}.svg".format(file_name,
                                                                 i), panel_out_path])
 
 
@@ -288,10 +305,20 @@ print("Estimated price is €", estimated_weight_g *
       (x_count + x_count - 1) * y_count * panel_count / 1000 * price_per_kilo)
 
 
+((scale(Mode.THREE_D, 0) - ops.Cube([100, 100, 100]).translate(
+    [-50, -50, -100])) + ops.Cylinder(d=led_diameter, h=1)).write("out/led-scales-py.single.scad")
 main(Mode.THREE_D, preview=True).write("out/led-scales-py.scad")
 main(Mode.TWO_D, preview=True).write("out/led-scales-py.2d.scad")
 main(Mode.PRINT, preview=False).write("out/led-scales-py.print.scad")
 main(Mode.POSITIONING, preview=False).write(
     "out/led-scales-py.positioning.scad")
 
-to_stls("panels/Led Scales Panel")
+# Create output directories if they don't exist
+if not os.path.exists("tiles"):
+    os.makedirs("tiles")
+    print("Created directory: tiles/")
+if not os.path.exists("panels"):
+    os.makedirs("panels")
+    print("Created directory: panels/")
+to_stls("tiles/Led Scales Tile")
+to_panel_svgs("panels/Led Scales Panel")
