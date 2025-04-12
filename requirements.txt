@@ -1,0 +1,10 @@
+cffi==1.17.1
+cryptography==44.0.1
+numpy==2.0.2
+openpyscad==0.5.0
+pycparser==2.22
+PyQt6==6.8.1
+PyQt6-Qt6==6.8.2
+PyQt6-sip==13.10.0
+scipy==1.13.1
+six==1.17.0
