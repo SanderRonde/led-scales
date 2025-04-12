@@ -317,11 +317,11 @@ main(Mode.POSITIONING, preview=False).write(
     "out/led-scales-py.positioning.scad")
 
 # Create output directories if they don't exist
-if not os.path.exists("tiles"):
-    os.makedirs("tiles")
-    print("Created directory: tiles/")
-if not os.path.exists("panels"):
-    os.makedirs("panels")
-    print("Created directory: panels/")
-to_stls("tiles/Led Scales Tile")
-to_panel_svgs("panels/Led Scales Panel")
+if not os.path.exists("out/tiles"):
+    os.makedirs("out/tiles")
+    print("Created directory: out/tiles/")
+if not os.path.exists("out/panels"):
+    os.makedirs("out/panels")
+    print("Created directory: out/panels/")
+to_stls("out/tiles/Led Scales Tile")
+to_panel_svgs("out/panels/Led Scales Panel")
