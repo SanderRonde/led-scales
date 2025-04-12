@@ -11,53 +11,57 @@ import subprocess
 import sys
 import os
 from enum import Enum
-from typing import Dict, Tuple, List, Union
+from typing import Dict, Tuple, List
+
+# Add parent directory to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import openpyscad as ops
+from config import ScaleConfig
+
+# Load configuration
+config = ScaleConfig()
 
 # Scale
-base_length = 25
-base_width = 2
-base_height = 110
-spike_size = 50
+base_length = config.base_length
+base_width = config.base_width
+base_height = config.base_height
+spike_size = config.spike_size
 
 # Scale lean
-lean_base = 5
-lean_factor = 0.05
+lean_base = config.lean_base
+lean_factor = config.lean_factor
 
 # Panel
-spacing = 55
-x_count = 6
-y_count = 12
+spacing = config.spacing
+x_count = config.x_count
+y_count = config.y_count
 
 # Panel counts
-panel_count = 3
+panel_count = config.panel_count
 
 # LED - not really but easier to drill
-led_diameter = 3
+led_diameter = config.led_diameter
 
 # Weight and price
-estimated_weight_g = 23 / 2
-price_per_kilo = 20
+estimated_weight_g = config.estimated_weight_g
+price_per_kilo = config.price_per_kilo
 
 # Printing
-print_bed_spacing = 400
-x_print_bed = 200
-y_print_bed = 200
-x_print_spacing = 15
-y_print_additional_spacing = 6
-print_outside_padding = 20
-scad_path = "B:/programs/Program Files/OpenSCAD/openscad.exe"
-x_per_build_plate_override = None
-y_per_build_plate_override: Union[int, None] = 1
-
-x_print_bed = x_print_bed - print_outside_padding
-y_print_bed = y_print_bed - print_outside_padding
+print_bed_spacing = config.print_bed_spacing
+x_print_bed = config.x_print_bed
+y_print_bed = config.y_print_bed
+x_print_spacing = config.x_print_spacing
+y_print_additional_spacing = config.y_print_additional_spacing
+print_outside_padding = config.print_outside_padding
+scad_path = config.scad_path
+x_per_build_plate_override = config.x_per_build_plate_override
+y_per_build_plate_override = config.y_per_build_plate_override
 
 # Debug
-is_fast = False
+is_fast = config.is_fast
 
-spike_height = base_height - spike_size
+spike_height = config.spike_height
 
 
 class Mode(Enum):
@@ -122,11 +126,10 @@ def draw_panel(mode: Mode, scale_x_offset: int):
     return (panel, coordinate_map)
 
 
-panel_width = (x_count) * spacing
-panel_height = (y_count + 0.5) * spacing
-total_width = panel_width * panel_count + \
-    (spacing * (panel_count - 1))
-total_height = panel_height
+panel_width = config.panel_width
+panel_height = config.panel_height
+total_width = config.total_width
+total_height = config.total_height
 
 
 def draw(mode: Mode):
@@ -331,12 +334,10 @@ main(Mode.POSITIONING, preview=False).write(
 to_stls(os.path.join(tiles_dir, "Led Scales Tile"))
 to_panel_svgs(os.path.join(panels_dir, "Led Scales Panel"))
 
-print("Panel dimensions are ", panel_width, "x", panel_height, flush=True)
-print("Panel count is ", panel_count, flush=True)
-print("Total dimensions are ", total_width, "x", total_height, flush=True)
-print("Square meters are ", (panel_width * panel_height * panel_count) / 1000000, flush=True)
-print("Scale count is ", (x_count + x_count - 1) * y_count * panel_count, flush=True)
-print("Estimated weight is ", estimated_weight_g *
-      (x_count + x_count - 1) * y_count * panel_count / 1000, "kg", flush=True)
-print("Estimated filament price is €", estimated_weight_g *
-      (x_count + x_count - 1) * y_count * panel_count / 1000 * price_per_kilo, flush=True)
+print("Panel dimensions are ", config.panel_width, "x", config.panel_height, flush=True)
+print("Panel count is ", config.panel_count, flush=True)
+print("Total dimensions are ", config.total_width, "x", config.total_height, flush=True)
+print("Square meters are ", config.total_area_m2, flush=True)
+print("Scale count is ", config.scale_count, flush=True)
+print("Estimated weight is ", config.total_weight_kg, "kg", flush=True)
+print("Estimated filament price is €", config.total_price_eur, flush=True)
