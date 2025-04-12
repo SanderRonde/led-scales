@@ -7,7 +7,28 @@ import signal
 import threading
 from pathlib import Path
 from typing import Union, List, TextIO
+from setuptools import setup, find_packages
 
+# Package configuration
+PACKAGE_CONFIG = {
+    'name': 'led-scales',
+    'version': '0.1.0',
+    'packages': find_packages(),
+    'install_requires': [
+        'rpi_ws281x; platform_system != "Windows"',  # Only install on non-Windows systems
+        'flask',  # Required for mock implementation
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'leds=leds.leds:main',  # Real LED implementation
+            'leds-mock=leds.leds:main_mock',  # Mock implementation
+        ],
+    },
+    'python_requires': '>=3.7',
+    'package_data': {
+        'leds.mock': ['templates/*.html'],  # Include HTML templates
+    },
+}
 
 def print_output(pipe: TextIO, prefix: str = "") -> None:
     for line in iter(pipe.readline, ''):
@@ -68,7 +89,7 @@ def run_command(command: Union[str, List[str]], shell: bool = True) -> None:
         sys.exit(1)
 
 
-def setup() -> None:
+def setup_venv() -> None:
     print("Setting up virtual environment...")
     venv_path = Path("venv")
 
@@ -78,10 +99,10 @@ def setup() -> None:
     # Activate virtual environment and install requirements
     if sys.platform == "win32":
         activate_script = venv_path / "Scripts" / "activate.bat"
-        pip_command = f'"{activate_script}" && pip install -r requirements.txt'
+        pip_command = f'"{activate_script}" && pip install -r requirements.txt && pip install -e .'
     else:
         activate_script = venv_path / "bin" / "activate"
-        pip_command = f'. "{activate_script}" && pip install -r requirements.txt'
+        pip_command = f'. "{activate_script}" && pip install -r requirements.txt && pip install -e .'
 
     run_command(pip_command)
     print("Setup complete!")
@@ -136,14 +157,27 @@ def help() -> None:
     print("  - 2D files: cad/out/panels/")
 
 
+# List of setuptools commands that should bypass our custom command handling
+SETUPTOOLS_COMMANDS = {
+    'build', 'install', 'develop', 'bdist_wheel', 'sdist', 'egg_info',
+    'easy_install', 'upload', 'register', 'check', 'test', 'build_ext',
+    'build_py', 'build_scripts', 'build_clib', 'clean', 'install_lib',
+    'install_headers', 'install_scripts', 'install_data', 'install_egg_info'
+}
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         help()
         sys.exit(1)
 
     command = sys.argv[1]
-    if command == "setup":
-        setup()
+    
+    # If it's a setuptools command, let setuptools handle it
+    if command in SETUPTOOLS_COMMANDS:
+        setup(**PACKAGE_CONFIG)
+    # Otherwise handle our custom commands
+    elif command == "setup":
+        setup_venv()
     elif command == "generate":
         generate_cad()
     elif command == "2d":
@@ -167,3 +201,6 @@ if __name__ == "__main__":
         print(f"Unknown command: {command}")
         help()
         sys.exit(1)
+else:
+    # When imported as a module, always run setup
+    setup(**PACKAGE_CONFIG)
