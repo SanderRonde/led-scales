@@ -274,9 +274,11 @@ def to_stls(file_name: str):
         ]).translate([(-total_width / 2) * 1.5, (-total_height / 2) * 1.5, -base_height * 1.5])
         tile_out_path = "{}-{}.scad".format(file_name, i)
         (tiles[i] - negative).write(tile_out_path)
-        if "--stl" in sys.argv:
-            subprocess.run([scad_path, "-o", "{}-{}.stl".format(file_name,
-                                                                i), tile_out_path])
+        if "--3d" in sys.argv:
+            print(f"Converting SCAD file to STL for tile {i}/{len(tiles)} ({(i+1)/len(tiles)*100:.1f}%)...", flush=True)
+            subprocess.run([scad_path, "-o", "{}-{}.stl".format(file_name, i), tile_out_path],
+                           stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
 
 
 def to_panel_svgs(file_name: str):
@@ -284,10 +286,11 @@ def to_panel_svgs(file_name: str):
     for i in range(len(panels)):
         panel_out_path = "{}-{}.scad".format(file_name, i)
         panels[i].write(panel_out_path)
-        if "--svg" in sys.argv:
-            subprocess.run([scad_path, "-o", "{}-{}.svg".format(file_name,
-                                                                i), panel_out_path])
-
+        if "--2d" in sys.argv:
+            print(f"Converting SCAD file to SVG for panel {i+1}/{len(panels)} ({(i+1)/len(panels)*100:.1f}%)...", flush=True)
+            subprocess.run([scad_path, "-o", "{}-{}.svg".format(file_name, i), panel_out_path],
+                           stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
 
 ops.base.MetaObject.object_definition['projection'] = (
     'projection', ('cut', ), True)
@@ -297,31 +300,43 @@ class Projection(ops.transformations._Transformation):
     pass
 
 
-print("Panel dimensions are ", panel_width, "x", panel_height)
-print("Panel count is ", panel_count)
-print("Total dimensions are ", total_width, "x", total_height)
-print("Square meters are ", (panel_width * panel_height * panel_count) / 1000000)
-print("Scale count is ", (x_count + x_count - 1) * y_count * panel_count)
-print("Estimated weight is ", estimated_weight_g *
-      (x_count + x_count - 1) * y_count * panel_count / 1000, "kg")
-print("Estimated price is €", estimated_weight_g *
-      (x_count + x_count - 1) * y_count * panel_count / 1000 * price_per_kilo)
-
-
-((scale(Mode.THREE_D, 0) - ops.Cube([100, 100, 100]).translate(
-    [-50, -50, -100])) + ops.Cylinder(d=led_diameter, h=1)).write("out/led-scales-py.single.scad")
-main(Mode.THREE_D, preview=True).write("out/led-scales-py.scad")
-main(Mode.TWO_D, preview=True).write("out/led-scales-py.2d.scad")
-main(Mode.PRINT, preview=False).write("out/led-scales-py.print.scad")
-main(Mode.POSITIONING, preview=False).write(
-    "out/led-scales-py.positioning.scad")
+# Get the directory of the current file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+out_dir = os.path.join(current_dir, "out")
+tiles_dir = os.path.join(out_dir, "tiles")
+panels_dir = os.path.join(out_dir, "panels")
 
 # Create output directories if they don't exist
-if not os.path.exists("out/tiles"):
-    os.makedirs("out/tiles")
-    print("Created directory: out/tiles/")
-if not os.path.exists("out/panels"):
-    os.makedirs("out/panels")
-    print("Created directory: out/panels/")
-to_stls("out/tiles/Led Scales Tile")
-to_panel_svgs("out/panels/Led Scales Panel")
+if not os.path.exists(out_dir):
+    os.makedirs(out_dir)
+    print(f"Created directory: {out_dir}", flush=True)
+if not os.path.exists(tiles_dir):
+    os.makedirs(tiles_dir)
+    print(f"Created directory: {tiles_dir}", flush=True)
+if not os.path.exists(panels_dir):
+    os.makedirs(panels_dir)
+    print(f"Created directory: {panels_dir}", flush=True)
+
+((scale(Mode.THREE_D, 0) - ops.Cube([100, 100, 100]).translate(
+    [-50, -50, -100])) + ops.Cylinder(d=led_diameter, h=1)).write(os.path.join(out_dir, "led-scales-py.single.scad"))
+main(Mode.THREE_D, preview=True).write(
+    os.path.join(out_dir, "led-scales-py.scad"))
+main(Mode.TWO_D, preview=True).write(
+    os.path.join(out_dir, "led-scales-py.2d.scad"))
+main(Mode.PRINT, preview=False).write(
+    os.path.join(out_dir, "led-scales-py.print.scad"))
+main(Mode.POSITIONING, preview=False).write(
+    os.path.join(out_dir, "led-scales-py.positioning.scad"))
+
+to_stls(os.path.join(tiles_dir, "Led Scales Tile"))
+to_panel_svgs(os.path.join(panels_dir, "Led Scales Panel"))
+
+print("Panel dimensions are ", panel_width, "x", panel_height, flush=True)
+print("Panel count is ", panel_count, flush=True)
+print("Total dimensions are ", total_width, "x", total_height, flush=True)
+print("Square meters are ", (panel_width * panel_height * panel_count) / 1000000, flush=True)
+print("Scale count is ", (x_count + x_count - 1) * y_count * panel_count, flush=True)
+print("Estimated weight is ", estimated_weight_g *
+      (x_count + x_count - 1) * y_count * panel_count / 1000, "kg", flush=True)
+print("Estimated filament price is €", estimated_weight_g *
+      (x_count + x_count - 1) * y_count * panel_count / 1000 * price_per_kilo, flush=True)
