@@ -122,9 +122,11 @@ def draw_panel(mode: Mode, scale_x_offset: int):
     return (panel, coordinate_map)
 
 
-total_width = (x_count) * spacing * panel_count + \
+panel_width = (x_count) * spacing
+panel_height = (y_count + 0.5) * spacing
+total_width = panel_width * panel_count + \
     (spacing * (panel_count - 1))
-total_height = (y_count + 0.5) * spacing
+total_height = panel_height
 
 
 def draw(mode: Mode):
@@ -295,9 +297,10 @@ class Projection(ops.transformations._Transformation):
     pass
 
 
-print("Panel dimensions are ", total_width, "x", total_height)
+print("Panel dimensions are ", panel_width, "x", panel_height)
 print("Panel count is ", panel_count)
-print("Total width is ", total_width)
+print("Total dimensions are ", total_width, "x", total_height)
+print("Square meters are ", (panel_width * panel_height * panel_count) / 1000000)
 print("Scale count is ", (x_count + x_count - 1) * y_count * panel_count)
 print("Estimated weight is ", estimated_weight_g *
       (x_count + x_count - 1) * y_count * panel_count / 1000, "kg")
