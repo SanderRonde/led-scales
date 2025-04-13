@@ -112,19 +112,17 @@ function drawScale(x, y, color, scale, config) {
  * @async
  * @returns {Promise<void>}
  */
-async function updateLEDs(pause) {
+async function updateLEDs() {
     try {
         /** @type {Array<Array<{red: number, green: number, blue: number, white: number}>>} */
         const pixelStrips = await fetch("/pixels").then((response) => {
             if (!response.ok) {
-                pause();
                 throw new Error(`Server returned ${response.status}`);
             }
             return response.json();
         });
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        console.log(pixelStrips[0][0])
         const scale = calculateScale();
         for (let panel = 0; panel < config.panel_count; panel++) {
             let pixelIndex = 0;
@@ -172,11 +170,10 @@ async function updateLEDs(pause) {
         }
     } catch (error) {
         console.error("Failed to update LEDs:", error);
-
         // Display error message on canvas
         ctx.font = "16px Arial";
         ctx.fillStyle = "red";
-        ctx.fillText("Connection lost. Retrying in 5 seconds...", 20, 50);
+        ctx.fillText("Connection lost. Retrying...", 20, 50);
     }
 }
 
@@ -186,7 +183,6 @@ async function updateLEDs(pause) {
  * @returns {Promise<void>}
  */
 async function initializeVisualizer() {
-    let paused = false;
     try {
         // Get configuration from server
         config = await fetch("/config").then((response) => {
@@ -203,17 +199,14 @@ async function initializeVisualizer() {
         window.addEventListener("resize", updateCanvasSize);
 
         // Start update loop
-        async function update() {
-            if (!paused) {
-                await updateLEDs();
-            }
+        function update() {
+            updateLEDs();
             setTimeout(update, config.delay);
         }
 
         update();
     } catch (error) {
         console.error("Failed to initialize visualizer:", error);
-        paused = true;
 
         // Set a basic canvas size for error display
         canvas.width = window.innerWidth * 0.8;
@@ -229,9 +222,7 @@ async function initializeVisualizer() {
         );
 
         // Retry initialization after 5 seconds
-        setTimeout(() => {
-            paused = false;
-        }, 5000);
+        setTimeout(initializeVisualizer, 5000);
     }
 }
 

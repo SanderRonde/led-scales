@@ -5,9 +5,12 @@ import subprocess
 import venv
 import signal
 import threading
+import time
 from pathlib import Path
 from typing import Union, List, TextIO
 from setuptools import setup, find_packages
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 # Package configuration
 PACKAGE_CONFIG = {
@@ -163,6 +166,7 @@ def help() -> None:
     print("  python setup.py help     - Show this help message")
     print("  python setup.py leds     - Run the LED implementation")
     print("  python setup.py leds-mock - Run the LED implementation in mock mode")
+    print("  python setup.py dev      - Run the server in development mode with auto-reload")
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -175,6 +179,75 @@ SETUPTOOLS_COMMANDS = {
     'build_py', 'build_scripts', 'build_clib', 'clean', 'install_lib',
     'install_headers', 'install_scripts', 'install_data', 'install_egg_info'
 }
+
+class RestartHandler(FileSystemEventHandler):
+    def __init__(self):
+        self.process = None
+        self.last_restart = 0
+        self.cooldown = 1.0  # Minimum time between restarts
+
+    def start_process(self):
+        # Kill existing process if any
+        self.stop_process()
+
+        # Start new process
+        print("\nStarting server...")
+        cmd = ['python', '-m', 'leds.leds', '--mock']
+        self.process = subprocess.Popen(
+            cmd,
+            preexec_fn=None if sys.platform == "win32" else os.setsid
+        )
+
+    def stop_process(self):
+        if self.process:
+            try:
+                if sys.platform == "win32":
+                    subprocess.run(['taskkill', '/F', '/T', '/PID', str(self.process.pid)])
+                else:
+                    pgid = os.getpgid(self.process.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                    # Give it a moment to terminate gracefully
+                    self.process.wait(timeout=1)
+            except (ProcessLookupError, subprocess.TimeoutExpired):
+                # Process already terminated or timeout waiting for it
+                pass
+            except Exception as e:
+                print(f"Warning: Failed to stop process: {e}")
+            finally:
+                self.process = None
+
+    def on_modified(self, event: FileSystemEvent) -> None:
+        if not event.is_directory and (event.src_path.endswith('.py') or event.src_path.endswith('.js')):
+            current_time = time.time()
+            if current_time - self.last_restart > self.cooldown:
+                self.last_restart = current_time
+                print("\nRestarting server due to file change...")
+                self.start_process()
+
+def dev() -> None:
+    """Run the server in development mode with auto-reload"""
+    print("Starting development server with auto-reload...")
+    
+    # Set up file watching
+    event_handler = RestartHandler()
+    observer = Observer()
+    
+    # Watch Python files
+    observer.schedule(event_handler, ".", recursive=True)
+    observer.start()
+
+    # Start initial process
+    event_handler.start_process()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        observer.stop()
+        event_handler.stop_process()
+        observer.join()
+        print("Server stopped")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -203,6 +276,8 @@ if __name__ == "__main__":
         run_leds()
     elif command == "leds-mock":
         run_leds(True)
+    elif command == "dev":
+        dev()  # New development mode with auto-reload
     elif command == "all":
         print("Generating 3D print files...")
         generate_cad("--3d")

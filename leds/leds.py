@@ -22,7 +22,6 @@ SLEEP_TIME_MOCK = 0.25
 # Is sleeping even needed?
 SLEEP_TIME_REAL = 0.01
 
-
 class LEDs:
     def __init__(self, mock: bool):
         self._app = Flask(__name__)
@@ -31,6 +30,7 @@ class LEDs:
         log.setLevel(logging.ERROR)
         self._controller = LEDController(config, mock)
         self._init_routes()
+        self._running = False
 
     def _get_sleep_time(self):
         if self._controller.is_mock:
@@ -67,33 +67,34 @@ class LEDs:
             })
 
     def listen(self):
-        """Start the web server in a background thread"""
-        def run_server():
-            self._app.run(port=config.web_port)
-
-        self._server_thread = threading.Thread(target=run_server, daemon=True)
-        self._server_thread.start()
+        """Start the web server in the main thread"""
         print(f"LEDs web server running on http://localhost:{config.web_port}")
+        self._app.run(port=config.web_port)
 
     def set_effect(self, effect: type[Effect]):
         """Set the effect to run"""
         self._effect = effect(self._controller)
+        self._running = True
 
     def start(self):
-        now = time.time()
-        while True:
-            elapsed_ms = int((time.time() - now) * 1000)
-            self._effect.run(elapsed_ms)
-            time.sleep(self._get_sleep_time())
+        """Start the LED effect in a background thread"""
+        def run_effect():
+            now = time.time()
+            while self._running:
+                elapsed_ms = int((time.time() - now) * 1000)
+                self._effect.run(elapsed_ms)
+                time.sleep(self._get_sleep_time())
+
+        self._effect_thread = threading.Thread(target=run_effect, daemon=True)
+        self._effect_thread.start()
 
 def main() -> None:
     mock = "--mock" in sys.argv
 
     leds = LEDs(mock)
-    leds.listen()
     leds.set_effect(RainbowRadialEffect)
-    leds.start()
-
+    leds.start()  # Start effect thread
+    leds.listen()  # Run Flask in main thread
 
 if __name__ == '__main__':
     # When run directly, default to mock mode for safety
