@@ -1,8 +1,8 @@
-from typing import Type, Any, List, Tuple, Dict, Callable
+from typing import Type, Any, List, Tuple, Dict, Callable, Union
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
 from config import ScaleConfig
-
+import math
 # Try to import the real library first
 try:
     from rpi_ws281x import PixelStrip as RealPixelStrip  # type: ignore
@@ -55,7 +55,7 @@ class LEDPanel:
         distance_from_center = self.distance_from_center
         scale_offset = (distance_from_center - 0.5) * self.config.x_count + (
             self.config.panel_spacing_scales * abs(distance_from_center)
-        )
+        ) + 0.5
         return scale_offset
 
 
@@ -66,28 +66,47 @@ class LEDController:
         self.config = config
         self.panels: List[LEDPanel] = [
             LEDPanel(PixelStrip, config, index, **kwargs) for index in range(config.panel_count)]
+        
+    def get_max_distance(self) -> float:
+        highest = 0
 
-    def map_coordinates(self, callback: Callable[[float, float], RGBW]) -> None:
+        def distance_callback(distance: float) -> None:
+            nonlocal highest
+            if distance > highest:
+                highest = distance
+
+        self.map_distance(distance_callback)
+        return highest
+
+    def map_coordinates(self, callback: Callable[[float, float], Union[RGBW, None]]) -> None:
         for panel in self.panels:
             base_x = panel.get_base_x()
-            for i in range(self.config.y_count):
-                pass
-            for pixel in panel.strip.getPixels():
-                pixel.r = callback(pixel.r)
-                pixel.g = callback(pixel.g)
-                pixel.b = callback(pixel.b)
-                pixel.w = callback(pixel.w)
+            center_y = self.config.y_count - 1
+            led_index = 0
+            y = 0
+            for _ in range(self.config.y_count):
+                for x in range(self.config.x_count - 1):
+                    color = callback(base_x + x + 0.5, center_y - y)
+                    if color is not None:
+                        panel.strip.setPixelColor(led_index, color)
+                    led_index += 1
+                y += 1
+                for x in range(self.config.x_count):
+                    color = callback(base_x + x, center_y - y + 0.5)
+                    if color is not None:
+                        panel.strip.setPixelColor(led_index, color)
+                    led_index += 1
+                y += 1
 
-    def map_distance(self, callback: Callable[[float], RGBW]) -> None:
+    def map_distance(self, callback: Callable[[float], Union[RGBW, None]]) -> None:
+        def coordinate_callback(x: float, y: float) -> Union[RGBW, None]:
+            return callback(math.sqrt(x**2 + y**2))
+
+        self.map_coordinates(coordinate_callback)
+
+    def show(self):
         for panel in self.panels:
-            base_x = panel.get_base_x()
-            for i in range(self.config.y_count):
-                pass
-            for pixel in panel.strip.getPixels():
-                pixel.r = callback(pixel.r)
-                pixel.g = callback(pixel.g)
-                pixel.b = callback(pixel.b)
-                pixel.w = callback(pixel.w)
+            panel.strip.show()
 
     def json(self):
         pixels: List[List[Dict[str, int]]] = []

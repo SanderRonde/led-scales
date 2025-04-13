@@ -6,7 +6,7 @@ import threading
 import logging
 from flask import Flask, render_template, jsonify, send_from_directory
 from leds.controller import LEDController
-from leds.effects.rainbow import RainbowEffect
+from leds.effects.rainbow_radial import RainbowRadialEffect
 from leds.effects.effect import Effect
 from config import ScaleConfig
 
@@ -84,18 +84,14 @@ class LEDs:
         while True:
             elapsed_ms = int((time.time() - now) * 1000)
             self._effect.run(elapsed_ms)
-            if self._controller.is_mock:
-                time.sleep(1)
-            else:
-                time.sleep(self._get_sleep_time())
-
+            time.sleep(self._get_sleep_time())
 
 def main() -> None:
     mock = "--mock" in sys.argv
 
     leds = LEDs(mock)
     leds.listen()
-    leds.set_effect(RainbowEffect)
+    leds.set_effect(RainbowRadialEffect)
     leds.start()
 
 

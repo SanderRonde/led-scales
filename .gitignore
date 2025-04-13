@@ -3,3 +3,4 @@ venv/
 __pycache__/
 
 led_scales.egg-info
+leds.egg-info

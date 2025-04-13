@@ -4,7 +4,7 @@ from pathlib import Path
 
 @dataclass
 class ScaleConfig:
-    web_port: int = 5000
+    web_port: int = 5001
     # A tuple of (pin, channel) per panel
     pins: List[Tuple[int, int]] = field(default_factory=lambda: [(13, 1), (19, 1), (26, 2)])
     

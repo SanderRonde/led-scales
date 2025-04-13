@@ -11,11 +11,11 @@ from setuptools import setup, find_packages
 
 # Package configuration
 PACKAGE_CONFIG = {
-    'name': 'led-scales',
+    'name': 'leds',
     'version': '0.1.0',
     'packages': find_packages(),
     'install_requires': [
-        'rpi_ws281x; platform_system != "Windows"',  # Only install on non-Windows systems
+        'rpi_ws281x; platform_system == "Linux"',  # Only install on Linux systems
         'flask',  # Required for mock implementation
     ],
     'entry_points': {
@@ -127,7 +127,7 @@ def run_leds(mock: bool = False) -> None:
         cmd = f'"{activate_script}" && leds {"--mock" if mock else ""}'
     else:
         activate_script = "venv/bin/activate"
-        cmd = f'. "{activate_script}" && python leds/leds.py {mock}'
+        cmd = f'. "{activate_script}" && leds {"--mock" if mock else ""}'
     run_command(cmd)
 
 def clean() -> None:
