@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import threading
+import logging
 from flask import Flask, render_template, jsonify, send_from_directory
 from leds.led_library import get_library
 from typing import List, Dict
@@ -28,6 +29,9 @@ class LEDs:
     
     def __init__(self):
         self._app = Flask(__name__)
+        # Disable Flask request logging
+        log = logging.getLogger('werkzeug')
+        log.setLevel(logging.ERROR)
         self._strips: List[PixelStripType] = list()
         self._init_routes()
         
