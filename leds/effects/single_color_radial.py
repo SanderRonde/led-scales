@@ -1,55 +1,52 @@
-from leds.effects.parameters import Parameter, ParameterType
+from leds.effects.parameters import ColorParameter, FloatParameter, EnumParameter
 from leds.controller import LEDController
 from leds.effects.effect import Effect
 from leds.color import RGBW, Color
-from typing import Literal
 import math
 
 
-class SingleColorRadialEffect(Effect):
-    PARAMETERS = [
-        Parameter(
-            name="color",
-            type=ParameterType.COLOR,
+class SingleColorRadialParameters:
+    def __init__(self):
+        self.color = ColorParameter(
+            default=Color(255, 0, 0),
             description="Color of the effect",
-        ),
-        Parameter(
-            name="speed",
-            type=ParameterType.FLOAT,
+        )
+        self.speed = FloatParameter(
+            default=0.6,
             description="Speed of the effect (0-1)",
-        ),
-        Parameter(
-            name="lower_bound",
-            type=ParameterType.FLOAT,
+        )
+        self.lower_bound = FloatParameter(
+            default=0.5,
             description="Lower bound of the effect (0-1)",
-        ),
-        Parameter(
-            name="direction",
-            type=ParameterType.ENUM,
+        )
+        self.direction = EnumParameter(
+            default="out",
             description="Direction of the effect",
             enum_values=["in", "out"]
         )
-    ]
 
-    def __init__(self, controller: LEDController, color: RGBW, speed: float, lower_bound: float, direction: Literal['in', 'out']):
+
+class SingleColorRadialEffect(Effect):
+    PARAMETERS = SingleColorRadialParameters()
+
+    def __init__(self, controller: LEDController):
         super().__init__(controller)
-        self._speed = speed
-        self._color = color
-        self._lower_bound = lower_bound
-        self._direction: Literal['in', 'out'] = direction
 
     def color_at_distance(self, distance: float) -> RGBW:
-        diff = 1 - self._lower_bound
+        lower_bound = self.PARAMETERS.lower_bound.get_value()
+        color = self.PARAMETERS.color.get_value()
+        diff = 1 - lower_bound
         abs_distance = (distance if distance < 0.5 else 1 - distance) * 2
-        final_brightness = self._lower_bound + diff * abs_distance
+        final_brightness = lower_bound + diff * abs_distance
         return Color(
-            math.floor(self._color.r * final_brightness),
-            math.floor(self._color.g * final_brightness),
-            math.floor(self._color.b * final_brightness)
+            math.floor(color.r * final_brightness),
+            math.floor(color.g * final_brightness),
+            math.floor(color.b * final_brightness)
         )
 
     def run(self, ms: int):
-        offset = self.time_offset(ms, self._speed, self._direction)
+        offset = self.time_offset(
+            ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value())
         self.controller.map_scaled_distance(lambda distance, index: self.color_at_distance(
             ((distance) + offset) % 1))
         self.controller.show()

@@ -1,7 +1,9 @@
 """Parameter definitions for LED effects"""
 from dataclasses import dataclass
-from typing import Any, List, Union
+from typing import Any, List, Dict
+from abc import ABC, abstractmethod
 from enum import Enum
+from leds.color import RGBW, Color
 
 
 class ParameterType(Enum):
@@ -13,11 +15,86 @@ class ParameterType(Enum):
 
 
 @dataclass
-class Parameter:
+class Parameter(ABC):
     """Definition of a single parameter"""
-    name: str
-    type: ParameterType
-    required: bool = True
     default: Any = None
     description: str = ""
-    enum_values: Union[List[str], None] = None
+    value: Any = None
+    type: ParameterType = NotImplemented
+
+    def __init__(self, default: Any = None, description: str = ""):
+        self.default = default if default is not None else self.default
+        self.description = description
+        self.value = self.default
+
+    @abstractmethod
+    def get_value(self) -> Any:
+        """Get the value of the parameter"""
+        self.value = self.default
+
+    def json(self) -> Dict[str, Any]:
+        return {
+            "type": self.type.value,
+            "description": self.description,
+            "value": self.value
+        }
+
+
+class FloatParameter(Parameter):
+    """Float parameter"""
+    default: float = 0.0
+    type: ParameterType = ParameterType.FLOAT
+
+    def __init__(self, default: float = 0.0, description: str = ""):
+        super().__init__(default, description)
+
+    def get_value(self) -> float:
+        """Get the value of the parameter"""
+        return self.value
+
+
+class ColorParameter(Parameter):
+    """Color parameter"""
+    default: RGBW = Color(0, 0, 0)
+    type: ParameterType = ParameterType.COLOR
+
+    def __init__(self, default: RGBW = Color(0, 0, 0), description: str = ""):
+        super().__init__(default, description)
+
+    def get_value(self) -> RGBW:
+        """Get the value of the parameter"""
+        return self.value
+
+
+class EnumParameter(Parameter):
+    """Enum parameter"""
+    default: str = ""
+    enum_values: List[str] = []
+    type: ParameterType = ParameterType.ENUM
+
+    def __init__(self, default: str = "", description: str = "", enum_values: List[str] = []):
+        super().__init__(default, description)
+        self.enum_values = enum_values
+
+    def get_value(self) -> str:
+        """Get the value of the parameter"""
+        return self.value
+
+    def json(self) -> Dict[str, Any]:
+        return {
+            **super().json(),
+            'enum_values': self.enum_values
+        }
+
+
+class ColorListParameter(Parameter):
+    """Color list parameter"""
+    default: List[RGBW] = []
+    type: ParameterType = ParameterType.COLOR_LIST
+
+    def __init__(self, default: List[RGBW] = [], description: str = ""):
+        super().__init__(default, description)
+
+    def get_value(self) -> List[RGBW]:
+        """Get the value of the parameter"""
+        return self.value

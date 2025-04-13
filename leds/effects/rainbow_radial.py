@@ -1,31 +1,30 @@
-from leds.effects.parameters import Parameter, ParameterType
+from leds.effects.parameters import FloatParameter, EnumParameter
 from leds.controller import LEDController
 from leds.effects.effect import Effect
-from typing import Literal
 
 
-class RainbowRadialEffect(Effect):
-    PARAMETERS = [
-        Parameter(
-            name="speed",
-            type=ParameterType.FLOAT,
+class RainbowRadialParameters:
+    def __init__(self):
+        self.speed = FloatParameter(
+            default=0.6,
             description="Speed of the effect (0-1)",
-        ),
-        Parameter(
-            name="direction",
-            type=ParameterType.ENUM,
+        )
+        self.direction = EnumParameter(
+            default="out",
             description="Direction of the effect",
             enum_values=["in", "out"]
         )
-    ]
 
-    def __init__(self, controller: LEDController, speed: float, direction: Literal['in', 'out']):
+
+class RainbowRadialEffect(Effect):
+    PARAMETERS = RainbowRadialParameters()
+
+    def __init__(self, controller: LEDController):
         super().__init__(controller)
-        self._speed = speed
-        self._direction: Literal['in', 'out'] = direction
 
     def run(self, ms: int):
-        offset = self.time_offset(ms, self._speed, self._direction)
+        offset = self.time_offset(
+            ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value())
         self.controller.map_scaled_distance(
             lambda distance, index: self.rainbow(distance + offset))
         self.controller.show()

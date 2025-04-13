@@ -2,13 +2,12 @@
 from leds.controller import LEDController
 from leds.color import RGBW
 from abc import ABC, abstractmethod
-from typing import Literal, List
-from leds.effects.parameters import Parameter
+from typing import Any
 
 
 class Effect(ABC):
     """Base class for LED effects"""
-    PARAMETERS: List[Parameter] = []
+    PARAMETERS: Any
 
     def __init__(self, controller: LEDController):
         self.controller = controller
@@ -49,7 +48,7 @@ class Effect(ABC):
         # Convert back to RGBW
         return RGBW.from_hsv(h, s, v, w)
 
-    def time_offset(self, ms: int, speed: float, direction: Literal['in', 'out']) -> float:
+    def time_offset(self, ms: int, speed: float, direction: str) -> float:
         min_sensitivity = 100  # Repeat every 100ms
         max_sensitivity = 1000 * 60 * 5  # Repeat every 5 minutes
         # Use exponential scaling to make sensitivity feel more natural

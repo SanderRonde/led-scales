@@ -4,12 +4,11 @@ import sys
 import time
 import threading
 import logging
-from typing import Callable
 from flask import Flask, render_template, jsonify, send_from_directory
 from flask_socketio import SocketIO
 from leds.controller import LEDController
-from leds.effects import MultiColorRadialEffect, Effect
-from leds.color import Color
+from leds.effects import RainbowEffect, get_effects
+from leds.effects.parameter_export import get_all_effects_parameters
 from config import ScaleConfig
 # Load configuration
 config = ScaleConfig()
@@ -33,7 +32,9 @@ class LEDs:
         log.setLevel(logging.ERROR)
         self._controller = LEDController(config, mock)
         self._init_routes()
+        self._effects = get_effects(self._controller)
         self._running = False
+        print(get_all_effects_parameters(self._effects))
 
     def _get_sleep_time(self) -> float:
         if self._controller.is_mock:
@@ -49,6 +50,10 @@ class LEDs:
         @self._app.route('/static/<path:filename>')
         def static_files(filename: str):  # type: ignore
             return send_from_directory(os.path.join(os.path.dirname(__file__), 'static'), filename)
+
+        @self._app.route('/effects')
+        def get_effects():  # type: ignore
+            return jsonify(get_all_effects_parameters(self._effects))
 
         @self._app.route('/config')
         def get_config():  # type: ignore
@@ -70,9 +75,9 @@ class LEDs:
         self._socketio.run(self._app, port=config.web_port,  # type: ignore
                            debug=False, use_reloader=False)
 
-    def set_effect(self, get_effect: Callable[[LEDController], Effect]):
+    def set_effect(self, effect_name: str):
         """Set the effect to run"""
-        self._effect = get_effect(self._controller)
+        self._effect = self._effects[effect_name]
         self._running = True
 
     def start(self) -> None:
@@ -95,8 +100,7 @@ def main() -> None:
     mock = "--mock" in sys.argv
 
     leds = LEDs(mock)
-    leds.set_effect(lambda controller: MultiColorRadialEffect(
-        controller, [Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255)], 0.6, 'out'))
+    leds.set_effect(RainbowEffect.__name__)
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 
