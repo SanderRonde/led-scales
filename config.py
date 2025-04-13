@@ -50,6 +50,8 @@ class ScaleConfig:
         # Adjust print bed dimensions
         if len(self.pins) != self.panel_count:
             raise ValueError(f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})")
+        if self.panel_count % 2 != 1:
+            raise ValueError("Panel count must be an odd number")
 
     @property
     def spike_height(self) -> float:
