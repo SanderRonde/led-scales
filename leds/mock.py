@@ -1,5 +1,5 @@
 from typing import Any, List
-from leds.controller import RGBW
+from leds.color import RGBW
 
 
 class MockPixelStrip:
