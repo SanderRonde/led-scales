@@ -120,14 +120,14 @@ def generate_cad(mode: str = "") -> None:
     run_command(cmd)
     print("CAD generation complete! Files can be found in the cad/out directory")
 
-def run_leds() -> None:
+def run_leds(mock: bool = False) -> None:
     print("Running LED implementation...")
     if sys.platform == "win32":
         activate_script = "venv\\Scripts\\activate.bat"
-        cmd = f'"{activate_script}" && leds'
+        cmd = f'"{activate_script}" && leds {"--mock" if mock else ""}'
     else:
         activate_script = "venv/bin/activate"
-        cmd = f'. "{activate_script}" && python leds/leds.py'
+        cmd = f'. "{activate_script}" && python leds/leds.py {mock}'
     run_command(cmd)
 
 def clean() -> None:
@@ -162,6 +162,7 @@ def help() -> None:
     print("  python setup.py all      - Generate all needed files")
     print("  python setup.py help     - Show this help message")
     print("  python setup.py leds     - Run the LED implementation")
+    print("  python setup.py leds-mock - Run the LED implementation in mock mode")
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -200,6 +201,8 @@ if __name__ == "__main__":
         help()
     elif command == "leds":
         run_leds()
+    elif command == "leds-mock":
+        run_leds(True)
     elif command == "all":
         print("Generating 3D print files...")
         generate_cad("--3d")

@@ -116,7 +116,7 @@ class LEDs:
 
 
 def main() -> None:
-    mock = "mock" in sys.argv
+    mock = "--mock" in sys.argv
 
     leds = LEDs()
     leds.listen()
