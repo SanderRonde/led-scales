@@ -4,10 +4,11 @@ import sys
 import time
 import threading
 import logging
+from typing import Callable
 from flask import Flask, render_template, jsonify, send_from_directory
 from leds.controller import LEDController
-from leds.effects.rainbow_radial import RainbowRadialEffect
-from leds.effects.effect import Effect
+from leds.effects import RainbowRadialEffect, SingleColorRadialEffect, Effect
+from leds.color import Color
 from config import ScaleConfig
 
 # Load configuration
@@ -71,9 +72,9 @@ class LEDs:
         print(f"LEDs web server running on http://localhost:{config.web_port}")
         self._app.run(port=config.web_port)
 
-    def set_effect(self, effect: type[Effect]):
+    def set_effect(self, get_effect: Callable[[LEDController], Effect]):
         """Set the effect to run"""
-        self._effect = effect(self._controller)
+        self._effect = get_effect(self._controller)
         self._running = True
 
     def start(self):
@@ -92,7 +93,7 @@ def main() -> None:
     mock = "--mock" in sys.argv
 
     leds = LEDs(mock)
-    leds.set_effect(RainbowRadialEffect)
+    leds.set_effect(lambda controller: SingleColorRadialEffect(controller, Color(255, 0, 0), 0.6, 0.1))
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 

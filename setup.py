@@ -192,7 +192,11 @@ class RestartHandler(FileSystemEventHandler):
 
         # Start new process
         print("\nStarting server...")
-        cmd = ['python', '-m', 'leds.leds', '--mock']
+        
+        # Use python from venv
+        python_executable = os.path.join("venv", "Scripts", "python.exe") if sys.platform == "win32" else os.path.join("venv", "bin", "python")
+        
+        cmd = [python_executable, '-m', 'leds.leds', '--mock']
         self.process = subprocess.Popen(
             cmd,
             preexec_fn=None if sys.platform == "win32" else os.setsid

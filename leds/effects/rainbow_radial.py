@@ -1,12 +1,13 @@
 from leds.controller import LEDController
-from leds.effects.rainbow import RainbowEffect
+from leds.effects.effect import Effect
 
-class RainbowRadialEffect(RainbowEffect):
-    def __init__(self, controller: LEDController):
+class RainbowRadialEffect(Effect):
+    def __init__(self, controller: LEDController, speed: float):
         super().__init__(controller)
         self._max_distance = controller.get_max_distance()
+        self._speed = speed
 
     def run(self, ms: int):
-        offset = (ms % 5000) / 5000
-        self.controller.map_distance(lambda distance: self.wheel(int(((distance / self._max_distance) - offset) * 255) % 255))
+        offset = self.time_offset(ms, self._speed)
+        self.controller.map_distance(lambda distance: self.rainbow(distance / self._max_distance - offset))
         self.controller.show()
