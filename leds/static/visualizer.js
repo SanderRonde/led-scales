@@ -103,7 +103,13 @@ function drawScale(x, y, color, scale, config) {
     // Draw LED
     ctx.beginPath();
     ctx.arc(x * scale, y * scale, 5 * scale, 0, Math.PI * 2);
-    ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+    // If white value is provided, use it to dim the RGB values
+    if (color.w !== undefined) {
+        const dimFactor = (255 - color.w) / 255;
+        ctx.fillStyle = `rgb(${color.r * dimFactor}, ${color.g * dimFactor}, ${color.b * dimFactor})`;
+    } else {
+        ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+    }
     ctx.fill();
 }
 
