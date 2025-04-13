@@ -11,7 +11,6 @@ from leds.controller import LEDController
 from leds.effects import MultiColorRadialEffect, Effect
 from leds.color import Color
 from config import ScaleConfig
-
 # Load configuration
 config = ScaleConfig()
 

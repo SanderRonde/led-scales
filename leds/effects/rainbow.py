@@ -2,6 +2,8 @@ from leds.effects.effect import Effect
 
 
 class RainbowEffect(Effect):
+    PARAMETERS = []
+
     def run(self, ms: int):
         offset = (ms % 5000) / 5000
         for i in range(len(self.controller.panels)):

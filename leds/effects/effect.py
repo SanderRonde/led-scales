@@ -1,10 +1,15 @@
+"""Base class for LED effects"""
 from leds.controller import LEDController
 from leds.color import RGBW
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Literal, List
+from leds.effects.parameters import Parameter
 
 
 class Effect(ABC):
+    """Base class for LED effects"""
+    PARAMETERS: List[Parameter] = []
+
     def __init__(self, controller: LEDController):
         self.controller = controller
 

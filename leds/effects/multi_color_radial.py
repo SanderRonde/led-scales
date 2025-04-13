@@ -3,9 +3,30 @@ from typing import List, Literal
 from leds.effects.effect import Effect
 from leds.color import RGBW
 import math
+from leds.effects.parameters import Parameter, ParameterType
 
 
 class MultiColorRadialEffect(Effect):
+    # Define parameters for the effect
+    PARAMETERS = [
+        Parameter(
+            name="colors",
+            type=ParameterType.COLOR_LIST,
+            description="List of colors to use in the radial effect",
+        ),
+        Parameter(
+            name="speed",
+            type=ParameterType.FLOAT,
+            description="Speed of the effect (0-1)",
+        ),
+        Parameter(
+            name="direction",
+            type=ParameterType.ENUM,
+            description="Direction of the effect",
+            enum_values=["in", "out"]
+        )
+    ]
+
     def __init__(self, controller: LEDController, colors: List[RGBW], speed: float, direction: Literal['in', 'out']):
         super().__init__(controller)
         self._colors = colors
