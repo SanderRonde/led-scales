@@ -18,12 +18,13 @@ const ctx = canvas.getContext("2d");
 /** @type {Config} */
 let config = null;
 
+/** @type {WebSocket} */
 let socket;
 
 // UI Elements
-const effectSelect = document.getElementById('effect-select');
-const parametersDiv = document.getElementById('parameters');
-const applyButton = document.getElementById('apply-effect');
+const effectSelect = document.getElementById("effect-select");
+const parametersDiv = document.getElementById("parameters");
+const applyButton = document.getElementById("apply-effect");
 
 /**
  * Calculates the appropriate scale factor based on window dimensions
@@ -116,7 +117,7 @@ function drawScale(x, y, color, scale, config) {
 
 /**
  * Updates all LEDs by receiving pixel data from the WebSocket server and redrawing
- * @param {Array<Array<{red: number, green: number, blue: number, white: number}>>} pixelStrips - The pixel data received from the server
+ * @param {Array<Array<{r: number, g: number, b: number, w?: number}>>} pixelStrips - The pixel data received from the server
  */
 function updateLEDsWithData(pixelStrips) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -131,17 +132,13 @@ function updateLEDsWithData(pixelStrips) {
         for (let y = 0; y < config.y_count; y++) {
             // Calculate the actual y-coordinate (flipped vertically)
             const displayY =
-                config.total_height -
-                y * config.spacing -
-                config.spacing / 2;
+                config.total_height - y * config.spacing - config.spacing / 2;
 
             for (let x = 0; x < config.x_count - 1; x++) {
                 // Draw horizontal row
                 if (pixelIndex < pixelStrips[panel].length) {
                     drawScale(
-                        panelOffsetX +
-                            x * config.spacing +
-                            config.spacing / 2,
+                        panelOffsetX + x * config.spacing + config.spacing / 2,
                         displayY,
                         pixelStrips[panel][pixelIndex],
                         scale,
@@ -190,23 +187,22 @@ async function initializeVisualizer() {
 
         // Initialize WebSocket connection
         socket = io();
-        socket.on('connect', () => {
-            console.log('Connected to WebSocket server');
+        socket.on("connect", () => {
+            console.log("Connected to WebSocket server");
         });
-        socket.on('disconnect', () => {
-            console.log('Disconnected from WebSocket server');
+        socket.on("disconnect", () => {
+            console.log("Disconnected from WebSocket server");
             // Display error message on canvas
             ctx.font = "16px Arial";
             ctx.fillStyle = "red";
             ctx.fillText("Connection lost. Retrying...", 20, 50);
         });
-        socket.on('led_update', (data) => {
+        socket.on("led_update", (data) => {
             updateLEDsWithData(data);
         });
 
         // Fetch available effects
         await fetchEffects();
-
     } catch (error) {
         console.error("Failed to initialize visualizer:", error);
 
@@ -231,123 +227,154 @@ async function initializeVisualizer() {
 // Initialize the visualizer
 initializeVisualizer();
 
-// Resize canvas to fit container
+/**
+ * Resizes the canvas to fit its container
+ */
 function resizeCanvas() {
     const container = canvas.parentElement;
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
 }
 
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
-// Fetch available effects
+/**
+ * Fetches available effects from the server
+ * @async
+ * @returns {Promise<void>}
+ */
 async function fetchEffects() {
     try {
-        const response = await fetch('/effects');
+        const response = await fetch("/effects");
         const effects = await response.json();
         populateEffectSelect(effects);
     } catch (error) {
-        console.error('Failed to fetch effects:', error);
+        console.error("Failed to fetch effects:", error);
     }
 }
 
-// Populate effect dropdown
+/**
+ * Populates the effect dropdown with available effects
+ * @param {Object} effects - Object containing effect definitions
+ */
 function populateEffectSelect(effects) {
     effectSelect.innerHTML = '<option value="">Select an effect...</option>';
-    Object.keys(effects).forEach(effectName => {
-        const option = document.createElement('option');
+    Object.keys(effects).forEach((effectName) => {
+        const option = document.createElement("option");
         option.value = effectName;
         option.textContent = effectName;
         effectSelect.appendChild(option);
     });
 }
 
-// Create parameter controls based on type
+/**
+ * Creates parameter controls based on parameter types
+ * @param {Object} parameters - Object containing parameter definitions
+ */
 function createParameterControls(parameters) {
-    parametersDiv.innerHTML = '';
-    
+    parametersDiv.innerHTML = "";
+
     Object.entries(parameters).forEach(([paramName, param]) => {
-        const group = document.createElement('div');
-        group.className = 'parameter-group';
-        
-        const label = document.createElement('label');
+        const group = document.createElement("div");
+        group.className = "parameter-group";
+
+        const label = document.createElement("label");
         label.textContent = paramName;
         if (param.description) {
             label.title = param.description;
         }
-        
+
         let input;
         switch (param.type) {
-            case 'float':
-                input = createFloatInput(param);
+            case "float":
+                input = createFloatInput(param, paramName);
                 break;
-            case 'color':
-                input = createColorInput(param);
+            case "color":
+                input = createColorInput(param, paramName);
                 break;
-            case 'enum':
-                input = createEnumInput(param);
+            case "enum":
+                input = createEnumInput(param, paramName);
                 break;
-            case 'color_list':
-                input = createColorListInput(param);
+            case "color_list":
+                input = createColorListInput(param, paramName);
                 break;
             default:
                 console.warn(`Unknown parameter type: ${param.type}`);
                 return;
         }
-        
+
         group.appendChild(label);
         group.appendChild(input);
         parametersDiv.appendChild(group);
     });
 }
+/**
+ * Creates a float input control
+ * @param {Object} param - Parameter definition
+ * @param {string} paramName - Name of the parameter
+ * @returns {HTMLElement} The created input container
+ */
+function createFloatInput(param, paramName) {
+    const container = document.createElement("div");
+    container.className = "range-input";
 
-function createFloatInput(param) {
-    const container = document.createElement('div');
-    container.className = 'range-input';
-    
-    const input = document.createElement('input');
-    input.type = 'range';
+    const input = document.createElement("input");
+    input.type = "range";
     input.min = 0;
-    input.max = 100;
-    input.step = 1;
+    input.max = 1;
+    input.step = 0.05;
     input.value = param.value || param.default || 0;
     input.dataset.param = paramName;
-    
-    const valueDisplay = document.createElement('span');
+
+    const valueDisplay = document.createElement("span");
     valueDisplay.textContent = input.value;
-    
-    input.addEventListener('input', () => {
+
+    input.addEventListener("input", () => {
         valueDisplay.textContent = input.value;
     });
-    
+
     container.appendChild(input);
     container.appendChild(valueDisplay);
     return container;
 }
 
-function createColorInput(param) {
-    const container = document.createElement('div');
-    container.className = 'color-input';
-    
-    const input = document.createElement('input');
-    input.type = 'color';
-    input.value = rgbToHex(param.value || param.default || {r: 0, g: 0, b: 0});
+/**
+ * Creates a color input control
+ * @param {Object} param - Parameter definition
+ * @param {string} paramName - Name of the parameter
+ * @returns {HTMLElement} The created input container
+ */
+function createColorInput(param, paramName) {
+    const container = document.createElement("div");
+    container.className = "color-input";
+
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = rgbToHex(
+        param.value || param.default || { r: 0, g: 0, b: 0 }
+    );
     input.dataset.param = paramName;
-    
+
     container.appendChild(input);
     return container;
 }
 
-function createEnumInput(param) {
-    const container = document.createElement('div');
-    container.className = 'enum-input';
-    
-    const select = document.createElement('select');
+/**
+ * Creates an enum input control
+ * @param {Object} param - Parameter definition
+ * @param {string} paramName - Name of the parameter
+ * @returns {HTMLElement} The created input container
+ */
+function createEnumInput(param, paramName) {
+    const container = document.createElement("div");
+    container.className = "enum-input";
+
+    const select = document.createElement("select");
     select.dataset.param = paramName;
-    
-    param.enum_values.forEach(value => {
-        const option = document.createElement('option');
+
+    param.enum_values.forEach((value) => {
+        const option = document.createElement("option");
         option.value = value;
         option.textContent = value;
         if (value === (param.value || param.default)) {
@@ -355,131 +382,159 @@ function createEnumInput(param) {
         }
         select.appendChild(option);
     });
-    
+
     container.appendChild(select);
     return container;
 }
 
-function createColorListInput(param) {
-    const container = document.createElement('div');
-    container.className = 'color-list-input';
-    
+/**
+ * Creates a color list input control
+ * @param {Object} param - Parameter definition
+ * @param {string} paramName - Name of the parameter
+ * @returns {HTMLElement} The created input container
+ */
+function createColorListInput(param, paramName) {
+    const container = document.createElement("div");
+    container.className = "color-list-input";
+
     const colors = param.value || param.default || [];
     colors.forEach((color, index) => {
-        const colorContainer = document.createElement('div');
-        colorContainer.className = 'color-item';
-        
-        const input = document.createElement('input');
-        input.type = 'color';
+        const colorContainer = document.createElement("div");
+        colorContainer.className = "color-item";
+
+        const input = document.createElement("input");
+        input.type = "color";
         input.value = rgbToHex(color);
         input.dataset.param = `${paramName}[${index}]`;
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = '×';
+
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "×";
         removeBtn.onclick = () => colorContainer.remove();
-        
+
         colorContainer.appendChild(input);
         colorContainer.appendChild(removeBtn);
         container.appendChild(colorContainer);
     });
-    
-    const addBtn = document.createElement('button');
-    addBtn.textContent = 'Add Color';
+
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "Add Color";
     addBtn.onclick = () => {
-        const colorContainer = document.createElement('div');
-        colorContainer.className = 'color-item';
-        
-        const input = document.createElement('input');
-        input.type = 'color';
-        input.value = '#000000';
-        input.dataset.param = `${paramName}[${colors.length}]`;
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = '×';
+        const colorContainer = document.createElement("div");
+        colorContainer.className = "color-item";
+
+        const input = document.createElement("input");
+        input.type = "color";
+        input.value = "#000000";
+        const currentColorCount = container.querySelectorAll('.color-item').length;
+        input.dataset.param = `${paramName}[${currentColorCount}]`;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "×";
         removeBtn.onclick = () => colorContainer.remove();
-        
+
         colorContainer.appendChild(input);
         colorContainer.appendChild(removeBtn);
         container.appendChild(colorContainer);
     };
-    
+
     container.appendChild(addBtn);
     return container;
 }
 
+/**
+ * Converts an RGB color object to a hex string
+ * @param {{r: number, g: number, b: number}} color - RGB color object
+ * @returns {string} Hex color string
+ */
 function rgbToHex(color) {
-    return `#${color.r.toString(16).padStart(2, '0')}${color.g.toString(16).padStart(2, '0')}${color.b.toString(16).padStart(2, '0')}`;
+    return `#${color.r.toString(16).padStart(2, "0")}${color.g
+        .toString(16)
+        .padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
 }
 
+/**
+ * Converts a hex color string to an RGB object
+ * @param {string} hex - Hex color string
+ * @returns {{r: number, g: number, b: number}|null} RGB color object or null if invalid
+ */
 function hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-    } : null;
+    return result
+        ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16),
+          }
+        : null;
 }
 
 // Handle effect selection
-effectSelect.addEventListener('change', async () => {
+effectSelect.addEventListener("change", async () => {
     const effectName = effectSelect.value;
     if (!effectName) return;
-    
+
     try {
-        const response = await fetch('/effects');
+        const response = await fetch("/effects");
         const effects = await response.json();
         const effect = effects[effectName];
-        if (effect && effect.parameters) {
-            createParameterControls(effect.parameters);
+        if (effect) {
+            createParameterControls(effect);
         }
     } catch (error) {
-        console.error('Failed to fetch effect parameters:', error);
+        console.error("Failed to fetch effect details:", error);
     }
 });
 
 // Apply selected effect
-applyButton.addEventListener('click', async () => {
+applyButton.addEventListener("click", async () => {
     const effectName = effectSelect.value;
     if (!effectName) return;
-    
+
     const parameters = {};
-    document.querySelectorAll('#parameters input, #parameters select').forEach(input => {
-        const paramName = input.dataset.param;
-        if (paramName.includes('[')) {
-            // Handle color list
-            const [baseName, index] = paramName.split('[');
-            const idx = parseInt(index);
-            if (!parameters[baseName]) {
-                parameters[baseName] = [];
-            }
-            parameters[baseName][idx] = hexToRgb(input.value);
-        } else {
-            // Handle other parameters
-            if (input.type === 'color') {
-                parameters[paramName] = hexToRgb(input.value);
+    document
+        .querySelectorAll("#parameters input, #parameters select")
+        .forEach((input) => {
+            const paramName = input.dataset.param;
+            if (!paramName) return;
+            
+            if (paramName.includes("[")) {
+                // Handle color list
+                const [baseName, indexStr] = paramName.split("[");
+                const index = parseInt(indexStr);
+                if (!parameters[baseName]) {
+                    parameters[baseName] = [];
+                }
+                parameters[baseName][index] = hexToRgb(input.value);
             } else {
-                parameters[paramName] = input.type === 'number' ? parseFloat(input.value) : input.value;
+                // Handle other parameters
+                if (input.type === "color") {
+                    parameters[paramName] = hexToRgb(input.value);
+                } else if (input.type === "range") {
+                    parameters[paramName] = parseFloat(input.value);
+                } else {
+                    parameters[paramName] = input.value;
+                }
             }
-        }
-    });
-    
+        });
+
     try {
-        const response = await fetch('/effects', {
-            method: 'POST',
+        const response = await fetch("/effects", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
             body: JSON.stringify({
                 effect_name: effectName,
-                parameters: parameters
-            })
+                parameters: parameters,
+            }),
         });
-        
+
         if (!response.ok) {
-            throw new Error('Failed to apply effect');
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
         }
+        
+        console.log("Effect applied successfully");
     } catch (error) {
-        console.error('Failed to apply effect:', error);
+        console.error("Failed to apply effect:", error);
     }
 });
-

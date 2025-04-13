@@ -68,6 +68,10 @@ class ColorParameter(Parameter):
     def get_value(self) -> RGBW:
         """Get the value of the parameter"""
         return self.value
+    
+    def set_value(self, value: Dict[str, int]):
+        """Set the value of the parameter"""
+        self.value = Color(value['r'], value['g'], value['b'])
 
 
 class EnumParameter(Parameter):
@@ -102,3 +106,8 @@ class ColorListParameter(Parameter):
     def get_value(self) -> List[RGBW]:
         """Get the value of the parameter"""
         return self.value
+
+    def set_value(self, value: List[Dict[str, int]]):
+        """Set the value of the parameter"""
+        self.value = [Color(color['r'], color['g'], color['b']) for color in value]
+
