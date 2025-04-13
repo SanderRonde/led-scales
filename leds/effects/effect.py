@@ -1,6 +1,8 @@
 from leds.controller import LEDController
 from leds.color import RGBW
 from abc import ABC, abstractmethod
+from typing import Literal
+
 
 class Effect(ABC):
     def __init__(self, controller: LEDController):
@@ -42,12 +44,16 @@ class Effect(ABC):
         # Convert back to RGBW
         return RGBW.from_hsv(h, s, v, w)
 
-    def time_offset(self, ms: int, speed: float) -> float:
-        min_sensitivity = 100 # Repeat every 100ms
-        max_sensitivity = 1000 * 60 * 5 # Repeat every 5 minutes
+    def time_offset(self, ms: int, speed: float, direction: Literal['in', 'out']) -> float:
+        min_sensitivity = 100  # Repeat every 100ms
+        max_sensitivity = 1000 * 60 * 5  # Repeat every 5 minutes
         # Use exponential scaling to make sensitivity feel more natural
-        actual_sensitivity = min_sensitivity * pow(max_sensitivity/min_sensitivity, 1 - speed)
-        return (ms % actual_sensitivity) / actual_sensitivity
+        actual_sensitivity = min_sensitivity * \
+            pow(max_sensitivity/min_sensitivity, 1 - speed)
+        offset = (ms % actual_sensitivity) / actual_sensitivity
+        if direction == 'out':
+            return -offset
+        return offset
 
     def rainbow(self, value: float) -> RGBW:
         value = value % 1

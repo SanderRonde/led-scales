@@ -8,7 +8,7 @@ from typing import Callable
 from flask import Flask, render_template, jsonify, send_from_directory
 from flask_socketio import SocketIO
 from leds.controller import LEDController
-from leds.effects import SingleColorRadialEffect, Effect
+from leds.effects import MultiColorRadialEffect, Effect
 from leds.color import Color
 from config import ScaleConfig
 
@@ -20,9 +20,10 @@ if __name__ == '__main__':
     sys.path.append(os.path.dirname(
         os.path.dirname(os.path.abspath(__file__))))
 
-SLEEP_TIME_MOCK = 0.25
+SLEEP_TIME_MOCK = 0.05
 # Is sleeping even needed?
 SLEEP_TIME_REAL = 0.01
+
 
 class LEDs:
     def __init__(self, mock: bool):
@@ -53,7 +54,6 @@ class LEDs:
         @self._app.route('/config')
         def get_config():  # type: ignore
             return jsonify({
-                'delay': self._get_sleep_time(),
                 'x_count': config.x_count,
                 'y_count': config.y_count,
                 'panel_count': config.panel_count,
@@ -68,7 +68,8 @@ class LEDs:
     def listen(self) -> None:
         """Start the web server in the main thread"""
         print(f"LEDs web server running on http://localhost:{config.web_port}")
-        self._socketio.run(self._app, port=config.web_port, debug=False, use_reloader=False) # type: ignore
+        self._socketio.run(self._app, port=config.web_port,  # type: ignore
+                           debug=False, use_reloader=False)
 
     def set_effect(self, get_effect: Callable[[LEDController], Effect]):
         """Set the effect to run"""
@@ -83,19 +84,23 @@ class LEDs:
                 elapsed_ms = int((time.time() - now) * 1000)
                 self._effect.run(elapsed_ms)
                 # Emit LED data through WebSocket
-                self._socketio.emit('led_update', self._controller.json(), namespace='/') # type: ignore
+                self._socketio.emit(  # type: ignore
+                    'led_update', self._controller.json(), namespace='/')
                 time.sleep(self._get_sleep_time())
 
         self._effect_thread = threading.Thread(target=run_effect, daemon=True)
         self._effect_thread.start()
 
+
 def main() -> None:
     mock = "--mock" in sys.argv
 
     leds = LEDs(mock)
-    leds.set_effect(lambda controller: SingleColorRadialEffect(controller, Color(255, 0, 0), 0.6, 0.1))
+    leds.set_effect(lambda controller: MultiColorRadialEffect(
+        controller, [Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255)], 0.6, 'out'))
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
+
 
 if __name__ == '__main__':
     # When run directly, default to mock mode for safety
