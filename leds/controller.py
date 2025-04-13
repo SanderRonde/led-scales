@@ -104,6 +104,18 @@ class LEDController:
 
         self.map_coordinates(coordinate_callback)
 
+    def map_angle(self, callback: Callable[[float], Union[RGBW, None]]) -> None:
+        """Maps LEDs based on their angle from center (0,0) in radians.
+        Angle 0 points right (positive x-axis), increases counter-clockwise."""
+        def coordinate_callback(x: float, y: float) -> Union[RGBW, None]:
+            angle = math.atan2(y, x)
+            # Ensure angle is positive (0 to 2π instead of -π to π)
+            if angle < 0:
+                angle += 2 * math.pi
+            return callback(angle)
+
+        self.map_coordinates(coordinate_callback)
+
     def show(self):
         for panel in self.panels:
             panel.strip.show()
