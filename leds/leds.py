@@ -4,7 +4,8 @@ import sys
 import time
 import threading
 import logging
-from flask import Flask, render_template, jsonify, send_from_directory
+from typing import Dict, Any, Union
+from flask import Flask, render_template, jsonify, send_from_directory, request
 from flask_socketio import SocketIO
 from leds.controller import LEDController
 from leds.effects import RainbowEffect, get_effects
@@ -34,7 +35,6 @@ class LEDs:
         self._init_routes()
         self._effects = get_effects(self._controller)
         self._running = False
-        print(get_all_effects_parameters(self._effects))
 
     def _get_sleep_time(self) -> float:
         if self._controller.is_mock:
@@ -54,6 +54,29 @@ class LEDs:
         @self._app.route('/effects')
         def get_effects():  # type: ignore
             return jsonify(get_all_effects_parameters(self._effects))
+
+        @self._app.route('/effects', methods=['POST'])
+        def set_effect():  # type: ignore
+            data: Dict[str, Any] = request.get_json() or {}
+            effect_name: Union[str, None] = data.get('effect_name')
+            if not effect_name:
+                return jsonify({
+                    'success': False,
+                    'error': 'No effect name provided'
+                }), 400
+
+            self._effect = self._effects[effect_name]
+            # Set parameters if provided
+            if 'parameters' in data:
+                for param_name, param_value in data['parameters'].items():
+                    if hasattr(self._effect.PARAMETERS, param_name):
+                        getattr(self._effect.PARAMETERS,
+                                param_name).set_value(param_value)
+
+            self._running = True
+            return jsonify({
+                'success': True
+            })
 
         @self._app.route('/config')
         def get_config():  # type: ignore

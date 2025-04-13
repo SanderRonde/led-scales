@@ -31,6 +31,10 @@ class Parameter(ABC):
     def get_value(self) -> Any:
         """Get the value of the parameter"""
         self.value = self.default
+        
+    def set_value(self, value: Any):
+        """Set the value of the parameter"""
+        self.value = value
 
     def json(self) -> Dict[str, Any]:
         return {
