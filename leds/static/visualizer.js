@@ -20,6 +20,11 @@ let config = null;
 
 let socket;
 
+// UI Elements
+const effectSelect = document.getElementById('effect-select');
+const parametersDiv = document.getElementById('parameters');
+const applyButton = document.getElementById('apply-effect');
+
 /**
  * Calculates the appropriate scale factor based on window dimensions
  * @returns {number} The scale factor to use
@@ -199,6 +204,9 @@ async function initializeVisualizer() {
             updateLEDsWithData(data);
         });
 
+        // Fetch available effects
+        await fetchEffects();
+
     } catch (error) {
         console.error("Failed to initialize visualizer:", error);
 
@@ -222,3 +230,256 @@ async function initializeVisualizer() {
 
 // Initialize the visualizer
 initializeVisualizer();
+
+// Resize canvas to fit container
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Fetch available effects
+async function fetchEffects() {
+    try {
+        const response = await fetch('/effects');
+        const effects = await response.json();
+        populateEffectSelect(effects);
+    } catch (error) {
+        console.error('Failed to fetch effects:', error);
+    }
+}
+
+// Populate effect dropdown
+function populateEffectSelect(effects) {
+    effectSelect.innerHTML = '<option value="">Select an effect...</option>';
+    Object.keys(effects).forEach(effectName => {
+        const option = document.createElement('option');
+        option.value = effectName;
+        option.textContent = effectName;
+        effectSelect.appendChild(option);
+    });
+}
+
+// Create parameter controls based on type
+function createParameterControls(parameters) {
+    parametersDiv.innerHTML = '';
+    
+    Object.entries(parameters).forEach(([paramName, param]) => {
+        const group = document.createElement('div');
+        group.className = 'parameter-group';
+        
+        const label = document.createElement('label');
+        label.textContent = paramName;
+        if (param.description) {
+            label.title = param.description;
+        }
+        
+        let input;
+        switch (param.type) {
+            case 'float':
+                input = createFloatInput(param);
+                break;
+            case 'color':
+                input = createColorInput(param);
+                break;
+            case 'enum':
+                input = createEnumInput(param);
+                break;
+            case 'color_list':
+                input = createColorListInput(param);
+                break;
+            default:
+                console.warn(`Unknown parameter type: ${param.type}`);
+                return;
+        }
+        
+        group.appendChild(label);
+        group.appendChild(input);
+        parametersDiv.appendChild(group);
+    });
+}
+
+function createFloatInput(param) {
+    const container = document.createElement('div');
+    container.className = 'range-input';
+    
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = 0;
+    input.max = 100;
+    input.step = 1;
+    input.value = param.value || param.default || 0;
+    input.dataset.param = paramName;
+    
+    const valueDisplay = document.createElement('span');
+    valueDisplay.textContent = input.value;
+    
+    input.addEventListener('input', () => {
+        valueDisplay.textContent = input.value;
+    });
+    
+    container.appendChild(input);
+    container.appendChild(valueDisplay);
+    return container;
+}
+
+function createColorInput(param) {
+    const container = document.createElement('div');
+    container.className = 'color-input';
+    
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = rgbToHex(param.value || param.default || {r: 0, g: 0, b: 0});
+    input.dataset.param = paramName;
+    
+    container.appendChild(input);
+    return container;
+}
+
+function createEnumInput(param) {
+    const container = document.createElement('div');
+    container.className = 'enum-input';
+    
+    const select = document.createElement('select');
+    select.dataset.param = paramName;
+    
+    param.enum_values.forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        if (value === (param.value || param.default)) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+    
+    container.appendChild(select);
+    return container;
+}
+
+function createColorListInput(param) {
+    const container = document.createElement('div');
+    container.className = 'color-list-input';
+    
+    const colors = param.value || param.default || [];
+    colors.forEach((color, index) => {
+        const colorContainer = document.createElement('div');
+        colorContainer.className = 'color-item';
+        
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = rgbToHex(color);
+        input.dataset.param = `${paramName}[${index}]`;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => colorContainer.remove();
+        
+        colorContainer.appendChild(input);
+        colorContainer.appendChild(removeBtn);
+        container.appendChild(colorContainer);
+    });
+    
+    const addBtn = document.createElement('button');
+    addBtn.textContent = 'Add Color';
+    addBtn.onclick = () => {
+        const colorContainer = document.createElement('div');
+        colorContainer.className = 'color-item';
+        
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = '#000000';
+        input.dataset.param = `${paramName}[${colors.length}]`;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => colorContainer.remove();
+        
+        colorContainer.appendChild(input);
+        colorContainer.appendChild(removeBtn);
+        container.appendChild(colorContainer);
+    };
+    
+    container.appendChild(addBtn);
+    return container;
+}
+
+function rgbToHex(color) {
+    return `#${color.r.toString(16).padStart(2, '0')}${color.g.toString(16).padStart(2, '0')}${color.b.toString(16).padStart(2, '0')}`;
+}
+
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
+// Handle effect selection
+effectSelect.addEventListener('change', async () => {
+    const effectName = effectSelect.value;
+    if (!effectName) return;
+    
+    try {
+        const response = await fetch('/effects');
+        const effects = await response.json();
+        const effect = effects[effectName];
+        if (effect && effect.parameters) {
+            createParameterControls(effect.parameters);
+        }
+    } catch (error) {
+        console.error('Failed to fetch effect parameters:', error);
+    }
+});
+
+// Apply selected effect
+applyButton.addEventListener('click', async () => {
+    const effectName = effectSelect.value;
+    if (!effectName) return;
+    
+    const parameters = {};
+    document.querySelectorAll('#parameters input, #parameters select').forEach(input => {
+        const paramName = input.dataset.param;
+        if (paramName.includes('[')) {
+            // Handle color list
+            const [baseName, index] = paramName.split('[');
+            const idx = parseInt(index);
+            if (!parameters[baseName]) {
+                parameters[baseName] = [];
+            }
+            parameters[baseName][idx] = hexToRgb(input.value);
+        } else {
+            // Handle other parameters
+            if (input.type === 'color') {
+                parameters[paramName] = hexToRgb(input.value);
+            } else {
+                parameters[paramName] = input.type === 'number' ? parseFloat(input.value) : input.value;
+            }
+        }
+    });
+    
+    try {
+        const response = await fetch('/effects', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                effect_name: effectName,
+                parameters: parameters
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to apply effect');
+        }
+    } catch (error) {
+        console.error('Failed to apply effect:', error);
+    }
+});
+
