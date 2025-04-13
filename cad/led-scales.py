@@ -33,7 +33,7 @@ lean_base = config.lean_base
 lean_factor = config.lean_factor
 
 # Panel
-spacing = config.spacing
+panel_spacing = config.spacing
 x_count = config.x_count
 y_count = config.y_count
 
@@ -115,14 +115,14 @@ def draw_panel(mode: Mode, scale_x_offset: int):
     for _i in range(-x_half, x_half):
         i = _i + scale_x_offset
         for j in range(-y_half, y_half):
-            distance: float = math.sqrt(i*i + j*j) * spacing
+            distance: float = math.sqrt(i*i + j*j) * panel_spacing
 
             coordinate_map[(i, j)] = distance
             panel.append(scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
-                j, i))]).translate([-(i * spacing) - (spacing / 2), -(j * spacing), 0]))
+                j, i))]).translate([-(i * panel_spacing) - (panel_spacing / 2), -(j * panel_spacing), 0]))
             if _i != -x_half:
                 panel.append(scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
-                    j + 0.5, i))]).translate([-(i * spacing), -(j * spacing) - (spacing / 2), 0]))
+                    j + 0.5, i))]).translate([-(i * panel_spacing), -(j * panel_spacing) - (panel_spacing / 2), 0]))
     return (panel, coordinate_map)
 
 
@@ -143,15 +143,15 @@ def draw(mode: Mode):
     result.append(center_panel)
 
     for i in range(1, math.floor((panel_count - 1) / 2) + 1):
-        left_offset = i * x_count + 1
+        left_offset = i * x_count + config.panel_spacing_scales
         (left_panel, left_coordinate_map) = draw_panel(mode, left_offset)
-        panels.append(left_panel.translate([left_offset * spacing, 0, 0]))
+        panels.append(left_panel.translate([left_offset * panel_spacing, 0, 0]))
         result.append(left_panel)
         joined_coordinate_map.update(left_coordinate_map)
 
-        right_offset = -(i * x_count) - 1
+        right_offset = -(i * x_count) - config.panel_spacing_scales
         (right_panel, right_coordinate_map) = draw_panel(mode, right_offset)
-        panels.append(right_panel.translate([right_offset * spacing, 0, 0]))
+        panels.append(right_panel.translate([right_offset * panel_spacing, 0, 0]))
         result.append(right_panel)
         joined_coordinate_map.update(right_coordinate_map)
 

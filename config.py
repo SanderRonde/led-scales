@@ -1,9 +1,13 @@
-from dataclasses import dataclass
-from typing import Optional, Union
+from dataclasses import dataclass, field
+from typing import Optional, Union, List, Tuple
 from pathlib import Path
 
 @dataclass
 class ScaleConfig:
+    web_port: int = 5000
+    # A tuple of (pin, channel) per panel
+    pins: List[Tuple[int, int]] = field(default_factory=lambda: [(13, 1), (19, 1), (26, 2)])
+    
     # Scale dimensions
     base_length: float = 25
     base_width: float = 2
@@ -15,7 +19,8 @@ class ScaleConfig:
     lean_factor: float = 0.05
 
     # Panel layout
-    spacing: float = 55
+    spacing: int = 55 # Spacing between scales
+    panel_spacing_scales: int = 1 # Spacing between panels
     x_count: int = 6
     y_count: int = 12
     panel_count: int = 3
@@ -43,8 +48,8 @@ class ScaleConfig:
 
     def __post_init__(self):
         # Adjust print bed dimensions
-        self.x_print_bed = self.x_print_bed - self.print_outside_padding
-        self.y_print_bed = self.y_print_bed - self.print_outside_padding
+        if len(self.pins) != self.panel_count:
+            raise ValueError(f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})")
 
     @property
     def spike_height(self) -> float:
@@ -67,8 +72,12 @@ class ScaleConfig:
         return self.panel_height
 
     @property
+    def scale_per_panel_count(self) -> int:
+        return (self.x_count + self.x_count - 1) * self.y_count
+
+    @property
     def scale_count(self) -> int:
-        return (self.x_count + self.x_count - 1) * self.y_count * self.panel_count
+        return self.scale_per_panel_count * self.panel_count
 
     @property
     def total_weight_kg(self) -> float:

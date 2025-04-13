@@ -30,11 +30,11 @@ PACKAGE_CONFIG = {
     },
 }
 
-def print_output(pipe: TextIO, prefix: str = "") -> None:
+def print_output(pipe: TextIO) -> None:
     for line in iter(pipe.readline, ''):
         if line.strip():  # Only print non-empty lines
             # Force immediate output
-            print(f"{prefix}{line.strip()}", flush=True)
+            print(line.strip(), flush=True)
 
 
 def run_command(command: Union[str, List[str]], shell: bool = True) -> None:
@@ -55,7 +55,7 @@ def run_command(command: Union[str, List[str]], shell: bool = True) -> None:
         stdout_thread = threading.Thread(
             target=print_output, args=(process.stdout,))
         stderr_thread = threading.Thread(
-            target=print_output, args=(process.stderr, "ERROR: "))
+            target=print_output, args=(process.stderr,))
 
         stdout_thread.start()
         stderr_thread.start()
@@ -120,6 +120,15 @@ def generate_cad(mode: str = "") -> None:
     run_command(cmd)
     print("CAD generation complete! Files can be found in the cad/out directory")
 
+def run_leds() -> None:
+    print("Running LED implementation...")
+    if sys.platform == "win32":
+        activate_script = "venv\\Scripts\\activate.bat"
+        cmd = f'"{activate_script}" && leds'
+    else:
+        activate_script = "venv/bin/activate"
+        cmd = f'. "{activate_script}" && python leds/leds.py'
+    run_command(cmd)
 
 def clean() -> None:
     print("Cleaning up...")
@@ -152,6 +161,7 @@ def help() -> None:
     print("  python setup.py clean    - Clean up generated files and environment")
     print("  python setup.py all      - Generate all needed files")
     print("  python setup.py help     - Show this help message")
+    print("  python setup.py leds     - Run the LED implementation")
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -188,6 +198,8 @@ if __name__ == "__main__":
         clean()
     elif command == "help":
         help()
+    elif command == "leds":
+        run_leds()
     elif command == "all":
         print("Generating 3D print files...")
         generate_cad("--3d")
