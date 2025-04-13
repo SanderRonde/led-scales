@@ -18,6 +18,8 @@ const ctx = canvas.getContext("2d");
 /** @type {Config} */
 let config = null;
 
+let socket;
+
 /**
  * Calculates the appropriate scale factor based on window dimensions
  * @returns {number} The scale factor to use
@@ -108,72 +110,55 @@ function drawScale(x, y, color, scale, config) {
 }
 
 /**
- * Updates all LEDs by fetching pixel data from the server and redrawing
- * @async
- * @returns {Promise<void>}
+ * Updates all LEDs by receiving pixel data from the WebSocket server and redrawing
+ * @param {Array<Array<{red: number, green: number, blue: number, white: number}>>} pixelStrips - The pixel data received from the server
  */
-async function updateLEDs() {
-    try {
-        /** @type {Array<Array<{red: number, green: number, blue: number, white: number}>>} */
-        const pixelStrips = await fetch("/pixels").then((response) => {
-            if (!response.ok) {
-                throw new Error(`Server returned ${response.status}`);
-            }
-            return response.json();
-        });
+function updateLEDsWithData(pixelStrips) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const scale = calculateScale();
+    for (let panel = 0; panel < config.panel_count; panel++) {
+        let pixelIndex = 0;
+        const panelOffsetX =
+            panel * (config.x_count * config.spacing + config.spacing) +
+            config.spacing / 2;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const scale = calculateScale();
-        for (let panel = 0; panel < config.panel_count; panel++) {
-            let pixelIndex = 0;
-            const panelOffsetX =
-                panel * (config.x_count * config.spacing + config.spacing) +
+        // Process pixels in the same order, but map them to bottom-up coordinates
+        for (let y = 0; y < config.y_count; y++) {
+            // Calculate the actual y-coordinate (flipped vertically)
+            const displayY =
+                config.total_height -
+                y * config.spacing -
                 config.spacing / 2;
 
-            // Process pixels in the same order, but map them to bottom-up coordinates
-            for (let y = 0; y < config.y_count; y++) {
-                // Calculate the actual y-coordinate (flipped vertically)
-                const displayY =
-                    config.total_height -
-                    y * config.spacing -
-                    config.spacing / 2;
-
-                for (let x = 0; x < config.x_count - 1; x++) {
-                    // Draw horizontal row
-                    if (pixelIndex < pixelStrips[panel].length) {
-                        drawScale(
-                            panelOffsetX +
-                                x * config.spacing +
-                                config.spacing / 2,
-                            displayY,
-                            pixelStrips[panel][pixelIndex],
-                            scale,
-                            config
-                        );
-                        pixelIndex++;
-                    }
+            for (let x = 0; x < config.x_count - 1; x++) {
+                // Draw horizontal row
+                if (pixelIndex < pixelStrips[panel].length) {
+                    drawScale(
+                        panelOffsetX +
+                            x * config.spacing +
+                            config.spacing / 2,
+                        displayY,
+                        pixelStrips[panel][pixelIndex],
+                        scale,
+                        config
+                    );
+                    pixelIndex++;
                 }
-                for (let x = 0; x < config.x_count; x++) {
-                    // Draw vertical row
-                    if (pixelIndex < pixelStrips[panel].length) {
-                        drawScale(
-                            panelOffsetX + x * config.spacing,
-                            displayY - config.spacing / 2,
-                            pixelStrips[panel][pixelIndex],
-                            scale,
-                            config
-                        );
-                        pixelIndex++;
-                    }
+            }
+            for (let x = 0; x < config.x_count; x++) {
+                // Draw vertical row
+                if (pixelIndex < pixelStrips[panel].length) {
+                    drawScale(
+                        panelOffsetX + x * config.spacing,
+                        displayY - config.spacing / 2,
+                        pixelStrips[panel][pixelIndex],
+                        scale,
+                        config
+                    );
+                    pixelIndex++;
                 }
             }
         }
-    } catch (error) {
-        console.error("Failed to update LEDs:", error);
-        // Display error message on canvas
-        ctx.font = "16px Arial";
-        ctx.fillStyle = "red";
-        ctx.fillText("Connection lost. Retrying...", 20, 50);
     }
 }
 
@@ -198,13 +183,22 @@ async function initializeVisualizer() {
         // Add resize handler
         window.addEventListener("resize", updateCanvasSize);
 
-        // Start update loop
-        function update() {
-            updateLEDs();
-            setTimeout(update, config.delay * 1000);
-        }
+        // Initialize WebSocket connection
+        socket = io();
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket server');
+        });
+        socket.on('disconnect', () => {
+            console.log('Disconnected from WebSocket server');
+            // Display error message on canvas
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "red";
+            ctx.fillText("Connection lost. Retrying...", 20, 50);
+        });
+        socket.on('led_update', (data) => {
+            updateLEDsWithData(data);
+        });
 
-        update();
     } catch (error) {
         console.error("Failed to initialize visualizer:", error);
 

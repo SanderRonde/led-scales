@@ -6,8 +6,9 @@ import threading
 import logging
 from typing import Callable
 from flask import Flask, render_template, jsonify, send_from_directory
+from flask_socketio import SocketIO
 from leds.controller import LEDController
-from leds.effects import RainbowRadialEffect, SingleColorRadialEffect, Effect
+from leds.effects import SingleColorRadialEffect, Effect
 from leds.color import Color
 from config import ScaleConfig
 
@@ -26,6 +27,7 @@ SLEEP_TIME_REAL = 0.01
 class LEDs:
     def __init__(self, mock: bool):
         self._app = Flask(__name__)
+        self._socketio = SocketIO(self._app, cors_allowed_origins="*")
         # Disable Flask request logging
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.ERROR)
@@ -33,13 +35,13 @@ class LEDs:
         self._init_routes()
         self._running = False
 
-    def _get_sleep_time(self):
+    def _get_sleep_time(self) -> float:
         if self._controller.is_mock:
             return SLEEP_TIME_MOCK
         else:
             return SLEEP_TIME_REAL
 
-    def _init_routes(self):
+    def _init_routes(self) -> None:
         @self._app.route('/')
         def home():  # type: ignore
             return render_template('visualizer.html')
@@ -47,10 +49,6 @@ class LEDs:
         @self._app.route('/static/<path:filename>')
         def static_files(filename: str):  # type: ignore
             return send_from_directory(os.path.join(os.path.dirname(__file__), 'static'), filename)
-
-        @self._app.route('/pixels')
-        def get_pixels():  # type: ignore
-            return self._controller.json()
 
         @self._app.route('/config')
         def get_config():  # type: ignore
@@ -67,23 +65,25 @@ class LEDs:
                 'scale_width': config.base_width,
             })
 
-    def listen(self):
+    def listen(self) -> None:
         """Start the web server in the main thread"""
         print(f"LEDs web server running on http://localhost:{config.web_port}")
-        self._app.run(port=config.web_port)
+        self._socketio.run(self._app, port=config.web_port, debug=False, use_reloader=False) # type: ignore
 
     def set_effect(self, get_effect: Callable[[LEDController], Effect]):
         """Set the effect to run"""
         self._effect = get_effect(self._controller)
         self._running = True
 
-    def start(self):
+    def start(self) -> None:
         """Start the LED effect in a background thread"""
-        def run_effect():
+        def run_effect() -> None:
             now = time.time()
             while self._running:
                 elapsed_ms = int((time.time() - now) * 1000)
                 self._effect.run(elapsed_ms)
+                # Emit LED data through WebSocket
+                self._socketio.emit('led_update', self._controller.json(), namespace='/') # type: ignore
                 time.sleep(self._get_sleep_time())
 
         self._effect_thread = threading.Thread(target=run_effect, daemon=True)
