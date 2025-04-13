@@ -1,10 +1,9 @@
-from typing import List
-from leds.led_library import PixelStripType
+from leds.controller import LEDController
 
 
 class Effect:
-    def __init__(self, strips: List[PixelStripType]):
-        self.strips = strips
+    def __init__(self, controller: LEDController):
+        self.controller = controller
 
     def run(self, ms: int):
         pass

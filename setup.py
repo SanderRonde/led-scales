@@ -185,7 +185,7 @@ if __name__ == "__main__":
     
     # If it's a setuptools command, let setuptools handle it
     if command in SETUPTOOLS_COMMANDS:
-        setup(**PACKAGE_CONFIG)
+        setup(**PACKAGE_CONFIG)  # type: ignore
     # Otherwise handle our custom commands
     elif command == "setup":
         setup_venv()
@@ -218,4 +218,4 @@ if __name__ == "__main__":
         sys.exit(1)
 else:
     # When imported as a module, always run setup
-    setup(**PACKAGE_CONFIG)
+    setup(**PACKAGE_CONFIG)  # type: ignore

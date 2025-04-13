@@ -1,4 +1,4 @@
-from leds.led_library import Color, RGBW
+from leds.color import RGBW, Color
 from leds.effects.effect import Effect
 
 
@@ -16,10 +16,11 @@ class RainbowEffect(Effect):
 
     def run(self, ms: int):
         offset = (ms % 5000) / 5000
-        for i in range(len(self.strips)):
+        for i in range(len(self.controller.panels)):
             for j in range(256):
-                for k in range(self.strips[i].numPixels()):
-                    pixel_index = int(((k + (offset * self.strips[i].numPixels())) * 256 // self.strips[i].numPixels()) + j)
-                    self.strips[i].setPixelColor(
+                for k in range(self.controller.panels[i].strip.numPixels()):
+                    pixel_index = int(((k + (offset * self.controller.panels[i].strip.numPixels(
+                    ))) * 256 // self.controller.panels[i].strip.numPixels()) + j)
+                    self.controller.panels[i].strip.setPixelColor(
                         k, self.wheel(pixel_index & 255))
-            self.strips[i].show()
+            self.controller.panels[i].strip.show()

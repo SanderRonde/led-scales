@@ -1,4 +1,4 @@
-from typing import Type, Any, List, Dict
+from typing import Type, Any, List, Tuple, Dict
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
 from config import ScaleConfig
@@ -9,6 +9,19 @@ try:
     real_library_available = True
 except ImportError:
     real_library_available = False
+
+
+
+
+def get_library(mock: bool) -> Tuple[Type[Any], bool]:
+    if not mock and not real_library_available:
+        print("Real LED library was forced but rpi_ws281x is not available, falling back to mock library")
+        return (MockPixelStrip, False)
+
+    if mock:
+        return (MockPixelStrip, False)
+    else:
+        return (RealPixelStrip, True)  # type: ignore
 
 
 class LEDPanel:
@@ -33,19 +46,10 @@ class LEDPanel:
 
 class LEDController:
     def __init__(self, config: ScaleConfig, mock: bool, **kwargs: Any):
-        # Inline get_library function
-        if not mock and not real_library_available:
-            print(
-                "Real LED library was forced but rpi_ws281x is not available, falling back to mock library")
-            PixelStrip, is_mock = MockPixelStrip, False
-        elif mock:
-            PixelStrip, is_mock = MockPixelStrip, False
-        else:
-            PixelStrip, is_mock = RealPixelStrip, True  # type: ignore
-
+        PixelStrip, is_mock = get_library(mock)
         self.is_mock = is_mock
         self.panels: List[LEDPanel] = [
-            LEDPanel(PixelStrip, config, index, **kwargs) for index in range(config.panel_count)]  # type: ignore
+            LEDPanel(PixelStrip, config, index, **kwargs) for index in range(config.panel_count)]
 
     def json(self):
         pixels: List[List[Dict[str, int]]] = []
