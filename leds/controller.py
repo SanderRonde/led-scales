@@ -67,7 +67,7 @@ class LEDController:
         self.panels: List[LEDPanel] = [
             LEDPanel(PixelStrip, config, index, **kwargs) for index in range(config.panel_count)]
         self._max_distance = self._get_max_distance()
-        
+
     def _get_max_distance(self) -> float:
         highest = 0
 
@@ -82,31 +82,38 @@ class LEDController:
     def map_coordinates(self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         for panel in self.panels:
             base_x = panel.get_base_x()
-            center_y = self.config.y_count - 1
+            center_y = self.config.y_count / 2
             led_index = 0
             y = 0
-            for _ in range(self.config.y_count):
-                for x in range(self.config.x_count - 1):
-                    color = callback(base_x + x + 0.5, center_y - y, (panel.index, led_index))
+            for x in range(self.config.x_count):
+                # First go up from the bottom left
+                for y in range(self.config.y_count):
+                    color = callback(base_x + x, center_y -
+                                     y - 1, (panel.index, led_index))
                     if color is not None:
                         panel.strip.setPixelColor(led_index, color)
                     led_index += 1
                 y += 1
-                for x in range(self.config.x_count):
-                    color = callback(base_x + x, center_y - y + 0.5, (panel.index, led_index))
-                    if color is not None:
-                        panel.strip.setPixelColor(led_index, color)
-                    led_index += 1
-                y += 1
+
+                if x != self.config.x_count - 1:
+                    # Then go down again
+                    for y in range(self.config.y_count):
+                        color = callback(
+                            base_x + x + 0.5, center_y - (self.config.y_count - (y + 0.5)), (panel.index, led_index))
+                        if color is not None:
+                            panel.strip.setPixelColor(led_index, color)
+                        led_index += 1
+                    y += 1
 
     def map_distance(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         def coordinate_callback(x: float, y: float, index: Tuple[int, int]) -> Union[RGBW, None]:
             return callback(math.sqrt(x**2 + y**2), index)
 
         self.map_coordinates(coordinate_callback)
-    
+
     def map_scaled_distance(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
-        self.map_distance(lambda distance, index: callback(distance / self._max_distance, index))
+        self.map_distance(lambda distance, index: callback(
+            distance / self._max_distance, index))
 
     def map_angle(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         """Maps LEDs based on their angle from center (0,0) in radians.

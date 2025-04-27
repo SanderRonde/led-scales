@@ -1,4 +1,5 @@
 const canvas = document.getElementById("canvas");
+/** @type {CanvasRenderingContext2D} */
 const ctx = canvas.getContext("2d");
 
 /**
@@ -69,10 +70,19 @@ function updateCanvasSize() {
  * @param {number} scale - Scale factor
  * @param {Config} config - Configuration object
  */
-function drawScale(x, y, color, scale, config) {
+function drawScale(index, x, y, color, scale, config) {
     // Calculate angle towards the center
     const centerX = config.total_width / 2;
     const centerY = config.total_height / 2 + config.scale_length / 2;
+
+    //  // Draw the LED index as text
+    // ctx.save();
+    // ctx.font = `${10 * scale}px Arial`;
+    // ctx.fillStyle = "#FFFFFF";
+    // ctx.textAlign = "center";
+    // ctx.textBaseline = "middle";
+    // ctx.fillText(index.toString(), x * scale, y * scale);
+    // ctx.restore();
 
     // Calculate the angle from the LED position to the center
     const dx = centerX - x;
@@ -128,18 +138,14 @@ function updateLEDsWithData(pixelStrips) {
             panel * (config.x_count * config.spacing + config.spacing) +
             config.spacing / 2;
 
-        // Process pixels in the same order, but map them to bottom-up coordinates
-        for (let y = 0; y < config.y_count; y++) {
-            // Calculate the actual y-coordinate (flipped vertically)
-            const displayY =
-                config.total_height - y * config.spacing - config.spacing / 2;
-
-            for (let x = 0; x < config.x_count - 1; x++) {
-                // Draw horizontal row
+        for (let x = 0; x < config.x_count; x++) {
+            // Draw row from bottom to top
+            for (let y = 0; y < config.y_count; y++) {
                 if (pixelIndex < pixelStrips[panel].length) {
                     drawScale(
-                        panelOffsetX + x * config.spacing + config.spacing / 2,
-                        displayY,
+                        pixelIndex,
+                        panelOffsetX + x * config.spacing,
+                        config.total_height - (y + 1) * config.spacing,
                         pixelStrips[panel][pixelIndex],
                         scale,
                         config
@@ -147,17 +153,25 @@ function updateLEDsWithData(pixelStrips) {
                     pixelIndex++;
                 }
             }
-            for (let x = 0; x < config.x_count; x++) {
-                // Draw vertical row
-                if (pixelIndex < pixelStrips[panel].length) {
-                    drawScale(
-                        panelOffsetX + x * config.spacing,
-                        displayY - config.spacing / 2,
-                        pixelStrips[panel][pixelIndex],
-                        scale,
-                        config
-                    );
-                    pixelIndex++;
+
+            // Then draw row from top to bottom
+            if (x !== config.x_count - 1) {
+                for (let y = config.y_count - 1; y >= 0; y--) {
+                    if (pixelIndex < pixelStrips[panel].length) {
+                        drawScale(
+                            pixelIndex,
+                            panelOffsetX +
+                                x * config.spacing +
+                                config.spacing / 2,
+                            config.total_height -
+                                y * config.spacing -
+                                config.spacing / 2,
+                            pixelStrips[panel][pixelIndex],
+                            scale,
+                            config
+                        );
+                        pixelIndex++;
+                    }
                 }
             }
         }
@@ -425,7 +439,8 @@ function createColorListInput(param, paramName) {
         const input = document.createElement("input");
         input.type = "color";
         input.value = "#000000";
-        const currentColorCount = container.querySelectorAll('.color-item').length;
+        const currentColorCount =
+            container.querySelectorAll(".color-item").length;
         input.dataset.param = `${paramName}[${currentColorCount}]`;
 
         const removeBtn = document.createElement("button");
@@ -496,7 +511,7 @@ applyButton.addEventListener("click", async () => {
         .forEach((input) => {
             const paramName = input.dataset.param;
             if (!paramName) return;
-            
+
             if (paramName.includes("[")) {
                 // Handle color list
                 const [baseName, indexStr] = paramName.split("[");
@@ -530,9 +545,11 @@ applyButton.addEventListener("click", async () => {
         });
 
         if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            throw new Error(
+                `Server returned ${response.status}: ${response.statusText}`
+            );
         }
-        
+
         console.log("Effect applied successfully");
     } catch (error) {
         console.error("Failed to apply effect:", error);
