@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Optional, Union, List, Tuple
 from pathlib import Path
 
+# Unless otherwise specified, all dimensions are in mm
+
 @dataclass
 class ScaleConfig:
     web_port: int = 5001
@@ -26,7 +28,9 @@ class ScaleConfig:
     panel_count: int = 3
 
     # LEDs
-    led_diameter: float = 3 # Note that this is just the marked size. Real size does not matter and is up to your drill bit.
+    led_diameter: float = 10
+    led_diffuser_thickness: float = 6
+    led_template_diameter: float = 3 # Note that this is just the marked size.
 
     # Filament weight and price
     estimated_weight_g: float = 23 / 2 # You probably don't want to change this

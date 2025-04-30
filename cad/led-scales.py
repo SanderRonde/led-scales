@@ -6,6 +6,8 @@
 # To auto watch and run:
 # bun x nodemon --exec "python led-scales.py" --watch "led-scales.py"
 
+from config import ScaleConfig
+import openpyscad as ops
 import math
 import subprocess
 import sys
@@ -16,8 +18,6 @@ from typing import Dict, Tuple, List
 # Add parent directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import openpyscad as ops
-from config import ScaleConfig
 
 # Load configuration
 config = ScaleConfig()
@@ -41,7 +41,7 @@ y_count = config.y_count
 panel_count = config.panel_count
 
 # LED - not really but easier to drill
-led_diameter = config.led_diameter
+led_diameter = config.led_template_diameter
 
 # Weight and price
 estimated_weight_g = config.estimated_weight_g
@@ -146,13 +146,15 @@ def draw(mode: Mode):
     for i in range(1, math.floor((panel_count - 1) / 2) + 1):
         left_offset = i * x_count + config.panel_spacing_scales
         (left_panel, left_coordinate_map) = draw_panel(mode, left_offset)
-        panels.append(left_panel.translate([left_offset * panel_spacing, 0, 0]))
+        panels.append(left_panel.translate(
+            [left_offset * panel_spacing, 0, 0]))
         result.append(left_panel)
         joined_coordinate_map.update(left_coordinate_map)
 
         right_offset = -(i * x_count) - config.panel_spacing_scales
         (right_panel, right_coordinate_map) = draw_panel(mode, right_offset)
-        panels.append(right_panel.translate([right_offset * panel_spacing, 0, 0]))
+        panels.append(right_panel.translate(
+            [right_offset * panel_spacing, 0, 0]))
         result.append(right_panel)
         joined_coordinate_map.update(right_coordinate_map)
 
@@ -279,7 +281,8 @@ def to_stls(file_name: str):
         tile_out_path = "{}-{}.scad".format(file_name, i)
         (tiles[i] - negative).write(tile_out_path)
         if "--3d" in sys.argv:
-            print(f"Converting SCAD file to STL for tile {i}/{len(tiles)} ({(i+1)/len(tiles)*100:.1f}%)...", flush=True)
+            print(
+                f"Converting SCAD file to STL for tile {i}/{len(tiles)} ({(i+1)/len(tiles)*100:.1f}%)...", flush=True)
             subprocess.run([scad_path, "-o", "{}-{}.stl".format(file_name, i), tile_out_path],
                            stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
@@ -291,11 +294,37 @@ def to_panel_svgs(file_name: str):
         panel_out_path = "{}-{}.scad".format(file_name, i)
         panels[i].write(panel_out_path)
         if "--2d" in sys.argv:
-            print(f"Converting SCAD file to SVG for panel {i+1}/{len(panels)} ({(i+1)/len(panels)*100:.1f}%)...", flush=True)
+            print(
+                f"Converting SCAD file to SVG for panel {i+1}/{len(panels)} ({(i+1)/len(panels)*100:.1f}%)...", flush=True)
             subprocess.run([scad_path, "-o", "{}-{}.svg".format(file_name, i), panel_out_path],
                            stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
 
+def diffusers(file_name: str):
+    # Create the diffuser shape
+    diffuser = ops.Union()
+    
+    base = ops.Cylinder(h=1, d1=config.led_diameter - 1, d2=config.led_diameter, _fn=100)
+    diffuser.append(base)
+
+    top = ops.Cylinder(h=config.led_diffuser_thickness - 1.5, d=config.led_diameter + 2, _fn=100)
+    diffuser.append(top.translate([0, 0, 1]))
+    
+    fillet = ops.Cylinder(h=0.5, d1=config.led_diameter + 2, d2=config.led_diameter + 1, _fn=100)
+    diffuser.append(fillet.translate([0, 0, config.led_diffuser_thickness - 0.5]))
+    
+    # Write to file
+    diffuser_path = os.path.join(out_dir, file_name + ".scad")
+    diffuser.write(diffuser_path)
+    
+    if "--3d" in sys.argv:
+        print(
+            f"Converting SCAD file to STL for diffuser...", flush=True)
+        subprocess.run([scad_path, "-o", "{}.stl".format(file_name), diffuser_path],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL)
+
+# This is not in the openpyscad library so we fix it here
 ops.base.MetaObject.object_definition['projection'] = (
     'projection', ('cut', ), True)
 
@@ -309,7 +338,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 out_dir = os.path.join(current_dir, "out")
 tiles_dir = os.path.join(out_dir, "tiles")
 panels_dir = os.path.join(out_dir, "panels")
-
+diffuser_dir = os.path.join(out_dir, "diffuser")
 # Create output directories if they don't exist
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
@@ -320,6 +349,9 @@ if not os.path.exists(tiles_dir):
 if not os.path.exists(panels_dir):
     os.makedirs(panels_dir)
     print(f"Created directory: {panels_dir}", flush=True)
+if not os.path.exists(diffuser_dir):
+    os.makedirs(diffuser_dir)
+    print(f"Created directory: {diffuser_dir}", flush=True)
 
 ((scale(Mode.THREE_D, 0) - ops.Cube([100, 100, 100]).translate(
     [-50, -50, -100])) + ops.Cylinder(d=led_diameter, h=1)).write(os.path.join(out_dir, "led-scales-py.single.scad"))
@@ -334,10 +366,13 @@ main(Mode.POSITIONING, preview=False).write(
 
 to_stls(os.path.join(tiles_dir, "Led Scales Tile"))
 to_panel_svgs(os.path.join(panels_dir, "Led Scales Panel"))
+diffusers(os.path.join(diffuser_dir, "diffuser"))
 
-print("Panel dimensions are ", config.panel_width, "x", config.panel_height, flush=True)
+print("Panel dimensions are ", config.panel_width,
+      "x", config.panel_height, flush=True)
 print("Panel count is ", config.panel_count, flush=True)
-print("Total dimensions are ", config.total_width, "x", config.total_height, flush=True)
+print("Total dimensions are ", config.total_width,
+      "x", config.total_height, flush=True)
 print("Square meters are ", config.total_area_m2, flush=True)
 print("Scale count is ", config.scale_count, flush=True)
 print("Estimated weight is ", config.total_weight_kg, "kg", flush=True)
