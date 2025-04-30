@@ -107,7 +107,7 @@ def scale(mode: Mode, distance: float):
 
 
 def draw_panel(mode: Mode, scale_x_offset: int):
-    coordinate_map: Dict[Tuple[int, int], float] = {}
+    coordinate_map: Dict[Tuple[float, float], float] = {}
 
     panel = ops.Union()
     x_half = math.floor(x_count / 2)
@@ -117,10 +117,11 @@ def draw_panel(mode: Mode, scale_x_offset: int):
         for j in range(-y_half, y_half):
             distance: float = math.sqrt(i*i + j*j) * panel_spacing
 
-            coordinate_map[(i, j)] = distance
+            coordinate_map[(i + 0.5, j)] = distance
             panel.append(scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
                 j, i))]).translate([-(i * panel_spacing) - (panel_spacing / 2), -(j * panel_spacing), 0]))
-            if _i != -x_half:
+            if i != -x_half:
+                coordinate_map[(i, j + 0.5)] = distance
                 panel.append(scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
                     j + 0.5, i))]).translate([-(i * panel_spacing), -(j * panel_spacing) - (panel_spacing / 2), 0]))
     return (panel, coordinate_map)
@@ -133,7 +134,7 @@ total_height = config.total_height
 
 
 def draw(mode: Mode):
-    joined_coordinate_map: Dict[Tuple[int, int], float] = {}
+    joined_coordinate_map: Dict[Tuple[float, float], float] = {}
 
     result = ops.Union()
     panels: List[ops.Union] = []
@@ -192,7 +193,7 @@ def get_optimal_tile_x(distance_values: List[float], y_per_build_plate: int, tot
     return (x_offset_for_lean(max_lean), x_lower_bound)
 
 
-def printable(coordinate_map: Dict[Tuple[int, int], float], mode: Mode, preview: bool):
+def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, preview: bool):
     distance_items = sorted(coordinate_map.items(), key=lambda item: item[1])
     result = ops.Union()
 
