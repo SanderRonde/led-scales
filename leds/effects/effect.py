@@ -1,5 +1,5 @@
 """Base class for LED effects"""
-from leds.controller import LEDController
+from leds.controllers.controller_base import ControllerBase
 from leds.color import RGBW
 from abc import ABC, abstractmethod
 from typing import Any
@@ -9,7 +9,7 @@ class Effect(ABC):
     """Base class for LED effects"""
     PARAMETERS: Any
 
-    def __init__(self, controller: LEDController):
+    def __init__(self, controller: ControllerBase):
         self.controller = controller
 
     @abstractmethod

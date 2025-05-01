@@ -1,29 +1,15 @@
-from typing import Type, Any, List, Tuple, Dict, Callable, Union
+from typing import Type, Any, List, Tuple, Dict, Callable, Union, TYPE_CHECKING
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
-from config import ScaleConfig
+from leds.controllers.controller_base import ControllerBase
 import math
-# Try to import the real library first
-try:
-    from rpi_ws281x import PixelStrip as RealPixelStrip  # type: ignore
-    real_library_available = True
-except ImportError:
-    real_library_available = False
 
-
-def get_library(mock: bool) -> Tuple[Type[Any], bool]:
-    if not mock and not real_library_available:
-        print("Real LED library was forced but rpi_ws281x is not available, falling back to mock library")
-        return (MockPixelStrip, False)
-
-    if mock:
-        return (MockPixelStrip, False)
-    else:
-        return (RealPixelStrip, True)  # type: ignore
+if TYPE_CHECKING:
+    from config import ScaleConfig
 
 
 class LEDPanel:
-    def __init__(self, PixelStrip: Type[MockPixelStrip], config: ScaleConfig, index: int, brightness: int = 255, **kwargs: Any):
+    def __init__(self, PixelStrip: Type[MockPixelStrip], config: "ScaleConfig", index: int, brightness: int = 255, **kwargs: Any):
         self.num_pixels = config.scale_per_panel_count
         self.index = index
         self.config = config
@@ -59,13 +45,12 @@ class LEDPanel:
         return scale_offset
 
 
-class LEDController:
-    def __init__(self, config: ScaleConfig, mock: bool, **kwargs: Any):
-        PixelStrip, is_real = get_library(mock)
-        self.is_mock = not is_real
+class ScalePanelLEDController(ControllerBase):
+    def __init__(self, config: "ScaleConfig", mock: bool, **kwargs: Any):
+        super().__init__(mock)
         self.config = config
         self.panels: List[LEDPanel] = [
-            LEDPanel(PixelStrip, config, index, **kwargs) for index in range(config.panel_count)]
+            LEDPanel(self.PixelStrip, config, index, **kwargs) for index in range(config.panel_count)]
         self._max_distance = self._get_max_distance()
 
     def _get_max_distance(self) -> float:
@@ -140,3 +125,19 @@ class LEDController:
                     {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w})
             pixels.append(strip_pixels)
         return pixels
+
+    def get_config(self) -> Any:
+        return {
+            'x_count': self.config.x_count,
+            'y_count': self.config.y_count,
+            'panel_count': self.config.panel_count,
+            'spacing': self.config.spacing,
+            'panel_spacing_scales': self.config.panel_spacing_scales,
+            'total_width': self.config.total_width,
+            'total_height': self.config.total_height,
+            'scale_length': self.config.base_length,
+            'scale_width': self.config.base_width,
+        }
+
+    def get_pixel_count(self) -> int:
+        return self.config.scale_count

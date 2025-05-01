@@ -7,12 +7,9 @@ import logging
 from typing import Dict, Any, Union
 from flask import Flask, render_template, jsonify, send_from_directory, request
 from flask_socketio import SocketIO
-from leds.controller import LEDController
 from leds.effects import RainbowEffect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
-from config import ScaleConfig
-# Load configuration
-config = ScaleConfig()
+from config import get_led_controller, BaseConfig, get_config
 
 # Add parent directory to Python path when running directly
 if __name__ == '__main__':
@@ -25,13 +22,14 @@ SLEEP_TIME_REAL = 0.01
 
 
 class LEDs:
-    def __init__(self, mock: bool):
+    def __init__(self, mock: bool, config: BaseConfig):
         self._app = Flask(__name__)
+        self.config = config
         self._socketio = SocketIO(self._app, cors_allowed_origins="*")
         # Disable Flask request logging
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.ERROR)
-        self._controller = LEDController(config, mock)
+        self._controller = get_led_controller(mock)
         self._init_routes()
         self._effects = get_effects(self._controller)
         self._running = False
@@ -80,22 +78,13 @@ class LEDs:
 
         @self._app.route('/config')
         def get_config():  # type: ignore
-            return jsonify({
-                'x_count': config.x_count,
-                'y_count': config.y_count,
-                'panel_count': config.panel_count,
-                'spacing': config.spacing,
-                'panel_spacing_scales': config.panel_spacing_scales,
-                'total_width': config.total_width,
-                'total_height': config.total_height,
-                'scale_length': config.base_length,
-                'scale_width': config.base_width,
-            })
+            return jsonify(self._controller.get_config())
 
     def listen(self) -> None:
         """Start the web server in the main thread"""
-        print(f"LEDs web server running on http://localhost:{config.web_port}")
-        self._socketio.run(self._app, port=config.web_port,  # type: ignore
+        print(
+            f"LEDs web server running on http://localhost:{self.config.web_port}")
+        self._socketio.run(self._app, port=self.config.web_port,  # type: ignore
                            debug=False, use_reloader=False)
 
     def set_effect(self, effect_name: str):
@@ -122,7 +111,7 @@ class LEDs:
 def main() -> None:
     mock = "--mock" in sys.argv
 
-    leds = LEDs(mock)
+    leds = LEDs(mock, get_config())
     leds.set_effect(RainbowEffect.__name__)
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread

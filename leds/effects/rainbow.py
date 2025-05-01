@@ -1,5 +1,7 @@
 from leds.effects.effect import Effect
 from leds.effects.parameters import FloatParameter, EnumParameter
+from leds.controllers.scale_panel_controller import ScalePanelLEDController
+
 
 class RainbowParameters:
     def __init__(self):
@@ -17,10 +19,14 @@ class RainbowParameters:
 class RainbowEffect(Effect):
     PARAMETERS = RainbowParameters()
 
+    def __init__(self, controller: ScalePanelLEDController):
+        super().__init__(controller)
+        self.controller = controller
+
     def run(self, ms: int):
         offset = self.time_offset(
             ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value())
-        total_pixels = self.controller.config.scale_count
+        total_pixels = self.controller.get_pixel_count()
         for i in range(len(self.controller.panels)):
             for j in range(self.controller.panels[i].strip.numPixels()):
                 pixel_index = i * \

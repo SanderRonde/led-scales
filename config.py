@@ -1,15 +1,22 @@
+import leds.controllers.scale_panel_controller as controllers
 from dataclasses import dataclass, field
 from typing import Optional, Union, List, Tuple
 from pathlib import Path
-
+from abc import ABC
 # Unless otherwise specified, all dimensions are in mm
 
+
+class BaseConfig(ABC):
+    web_port: int = 5001
+
+
 @dataclass
-class ScaleConfig:
+class ScaleConfig(BaseConfig):
     web_port: int = 5001
     # A tuple of (pin, channel) per panel
-    pins: List[Tuple[int, int]] = field(default_factory=lambda: [(13, 1), (19, 1), (26, 2)])
-    
+    pins: List[Tuple[int, int]] = field(
+        default_factory=lambda: [(13, 1), (19, 1), (26, 2)])
+
     # Scale dimensions
     base_length: float = 25
     base_width: float = 2
@@ -21,8 +28,8 @@ class ScaleConfig:
     lean_factor: float = 0.05
 
     # Panel layout
-    spacing: int = 55 # Spacing between scales
-    panel_spacing_scales: int = 1 # Spacing between panels
+    spacing: int = 55  # Spacing between scales
+    panel_spacing_scales: int = 1  # Spacing between panels
     x_count: int = 6
     y_count: int = 12
     panel_count: int = 3
@@ -30,11 +37,11 @@ class ScaleConfig:
     # LEDs
     led_diameter: float = 10
     led_diffuser_thickness: float = 6
-    led_template_diameter: float = 3 # Note that this is just the marked size.
+    led_template_diameter: float = 3  # Note that this is just the marked size.
 
     # Filament weight and price
-    estimated_weight_g: float = 23 / 2 # You probably don't want to change this
-    price_per_kilo: float = 20 # Price in {currency} per kilogram of filament
+    estimated_weight_g: float = 23 / 2  # You probably don't want to change this
+    price_per_kilo: float = 20  # Price in {currency} per kilogram of filament
 
     # 3D Printing
     x_print_bed: float = 200
@@ -42,10 +49,13 @@ class ScaleConfig:
     x_print_spacing: float = 15
     y_print_additional_spacing: float = 6
     print_outside_padding: float = 20
-    scad_path: Union[str, Path] = "B:/programs/Program Files/OpenSCAD/openscad.exe" # You'll want to change this
+    # You'll want to change this
+    scad_path: Union[str,
+                     Path] = "B:/programs/Program Files/OpenSCAD/openscad.exe"
     x_per_build_plate_override: Optional[int] = None
     y_per_build_plate_override: Optional[int] = 1
-    print_bed_spacing: float = 400 # This is purely visual and doesn't affect the result
+    # This is purely visual and doesn't affect the result
+    print_bed_spacing: float = 400
 
     # Debug
     is_fast: bool = False
@@ -53,7 +63,8 @@ class ScaleConfig:
     def __post_init__(self):
         # Adjust print bed dimensions
         if len(self.pins) != self.panel_count:
-            raise ValueError(f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})")
+            raise ValueError(
+                f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})")
         if self.panel_count % 2 != 1:
             raise ValueError("Panel count must be an odd number")
 
@@ -97,5 +108,14 @@ class ScaleConfig:
     def total_area_m2(self) -> float:
         return (self.panel_width * self.panel_height * self.panel_count) / 1000000
 
-# Default configuration
-default_config = ScaleConfig() 
+
+_config = ScaleConfig()
+
+
+def get_config() -> BaseConfig:
+    return _config
+
+
+def get_led_controller(mock: bool) -> controllers.ControllerBase:
+    # Can use any of the controllers in the controllers package
+    return controllers.ScalePanelLEDController(_config, mock)

@@ -1,5 +1,5 @@
 from leds.effects.parameters import FloatParameter, EnumParameter
-from leds.controller import LEDController
+from leds.controllers.controller_base import ControllerBase
 from leds.effects.effect import Effect
 
 
@@ -19,7 +19,7 @@ class RainbowRadialParameters:
 class RainbowRadialEffect(Effect):
     PARAMETERS = RainbowRadialParameters()
 
-    def __init__(self, controller: LEDController):
+    def __init__(self, controller: ControllerBase):
         super().__init__(controller)
 
     def run(self, ms: int):

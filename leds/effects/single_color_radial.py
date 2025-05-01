@@ -1,5 +1,5 @@
 from leds.effects.parameters import ColorParameter, FloatParameter, EnumParameter
-from leds.controller import LEDController
+from leds.controllers.controller_base import ControllerBase
 from leds.effects.effect import Effect
 from leds.color import RGBW, Color
 import math
@@ -29,7 +29,7 @@ class SingleColorRadialParameters:
 class SingleColorRadialEffect(Effect):
     PARAMETERS = SingleColorRadialParameters()
 
-    def __init__(self, controller: LEDController):
+    def __init__(self, controller: ControllerBase):
         super().__init__(controller)
 
     def color_at_distance(self, distance: float) -> RGBW:

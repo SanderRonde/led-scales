@@ -300,29 +300,35 @@ def to_panel_svgs(file_name: str):
                            stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
 
+
 def diffusers(file_name: str):
     # Create the diffuser shape
     diffuser = ops.Union()
-    
-    base = ops.Cylinder(h=1, d1=config.led_diameter - 1, d2=config.led_diameter, _fn=100)
+
+    base = ops.Cylinder(h=1, d1=config.led_diameter - 1,
+                        d2=config.led_diameter, _fn=100)
     diffuser.append(base)
 
-    top = ops.Cylinder(h=config.led_diffuser_thickness - 1.5, d=config.led_diameter + 2, _fn=100)
+    top = ops.Cylinder(h=config.led_diffuser_thickness -
+                       1.5, d=config.led_diameter + 2, _fn=100)
     diffuser.append(top.translate([0, 0, 1]))
-    
-    fillet = ops.Cylinder(h=0.5, d1=config.led_diameter + 2, d2=config.led_diameter + 1, _fn=100)
-    diffuser.append(fillet.translate([0, 0, config.led_diffuser_thickness - 0.5]))
-    
+
+    fillet = ops.Cylinder(h=0.5, d1=config.led_diameter + 2,
+                          d2=config.led_diameter + 1, _fn=100)
+    diffuser.append(fillet.translate(
+        [0, 0, config.led_diffuser_thickness - 0.5]))
+
     # Write to file
     diffuser_path = os.path.join(out_dir, file_name + ".scad")
     diffuser.write(diffuser_path)
-    
+
     if "--3d" in sys.argv:
         print(
             f"Converting SCAD file to STL for diffuser...", flush=True)
         subprocess.run([scad_path, "-o", "{}.stl".format(file_name), diffuser_path],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+
 
 # This is not in the openpyscad library so we fix it here
 ops.base.MetaObject.object_definition['projection'] = (
