@@ -1,23 +1,3 @@
-/**
- * @typedef {Object} Config
- * @property {number} x_count - Number of scales in x direction per panel
- * @property {number} y_count - Number of scales in y direction
- * @property {number} panel_count - Number of panels
- * @property {number} spacing - Spacing between scales
- * @property {number} total_width - Total width of all panels
- * @property {number} total_height - Total height of all panels
- * @property {number} panel_spacing_scales - Spacing between panels in scale units
- * @property {number} scale_length - Length of each scale
- * @property {number} scale_width - Width of each scale
- * @property {number} delay - Delay between updates in milliseconds
- */
-
-/** @type {Config} */
-let config = null;
-
-/** @type {WebSocket} */
-let socket;
-
 // UI Elements
 const effectSelect = document.getElementById("effect-select");
 const parametersDiv = document.getElementById("parameters");
