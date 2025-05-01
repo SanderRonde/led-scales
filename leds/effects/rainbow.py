@@ -26,7 +26,7 @@ class RainbowEffect(Effect):
     def run(self, ms: int):
         offset = self.time_offset(
             ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value())
-        total_pixels = self.controller.get_pixel_count()
+        total_pixels = self.controller.config.get_led_count()
         for i in range(len(self.controller.panels)):
             for j in range(self.controller.panels[i].strip.numPixels()):
                 pixel_index = i * \

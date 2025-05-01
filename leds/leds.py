@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any, Union
 from flask import Flask, render_template, jsonify, send_from_directory, request
 from flask_socketio import SocketIO
-from leds.effects import RainbowEffect, get_effects
+from leds.effects import SingleColorRadialEffect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
 from config import get_led_controller, BaseConfig, get_config
 
@@ -102,7 +102,7 @@ class LEDs:
 
         @self._app.route('/config')
         def get_config():  # type: ignore
-            return jsonify(self._controller.get_config())
+            return jsonify(self._controller.get_visualizer_config())
 
     def listen(self) -> None:
         """Start the web server in the main thread"""
@@ -136,7 +136,7 @@ def main() -> None:
     mock = "--mock" in sys.argv
 
     leds = LEDs(mock, get_config())
-    leds.set_effect(RainbowEffect.__name__)
+    leds.set_effect(SingleColorRadialEffect.__name__)
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 
