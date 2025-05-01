@@ -23,7 +23,7 @@ SLEEP_TIME_REAL = 0.01
 
 class LEDs:
     def __init__(self, mock: bool, config: BaseConfig):
-        self._app = Flask(__name__)
+        self._app = Flask(__name__, static_folder=None)
         self.config = config
         self._socketio = SocketIO(self._app, cors_allowed_origins="*")
         # Disable Flask request logging
@@ -43,14 +43,32 @@ class LEDs:
     def _init_routes(self) -> None:
         @self._app.route('/')
         def home():  # type: ignore
+            print("Serving home page")
             return render_template('visualizer.html')
 
         @self._app.route('/static/<path:filename>')
         def static_files(filename: str):  # type: ignore
-            return send_from_directory(os.path.join(os.path.dirname(__file__), 'static'), filename)
+            static_dir = os.path.join(os.path.dirname(__file__), 'static')
+            response = send_from_directory(static_dir, filename)
+            print(f"Serving {filename} with mimetype {response.mimetype}")
+
+            # Set correct MIME types for common web files
+            if filename.endswith('.js'):
+                response.headers['Content-Type'] = 'application/javascript'
+            elif filename.endswith('.css'):
+                response.headers['Content-Type'] = 'text/css'
+            elif filename.endswith('.html'):
+                response.headers['Content-Type'] = 'text/html'
+            elif filename.endswith('.json'):
+                response.headers['Content-Type'] = 'application/json'
+            elif filename.endswith('.svg'):
+                response.headers['Content-Type'] = 'image/svg+xml'
+            # For other file types, the default MIME type from send_from_directory is used
+
+            return response
 
         @self._app.route('/effects')
-        def get_effects():  # type: ignore
+        def get_effects_route():  # type: ignore Renamed to avoid conflict
             return jsonify(get_all_effects_parameters(self._effects))
 
         @self._app.route('/effects', methods=['POST'])
@@ -62,6 +80,12 @@ class LEDs:
                     'success': False,
                     'error': 'No effect name provided'
                 }), 400
+
+            if effect_name not in self._effects:
+                return jsonify({
+                    'success': False,
+                    'error': f'Effect "{effect_name}" not found'
+                }), 404
 
             self._effect = self._effects[effect_name]
             # Set parameters if provided
