@@ -1,4 +1,5 @@
 from typing import Type, Any, Tuple, Callable, Union
+import math
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
 from abc import ABC, abstractmethod
@@ -27,23 +28,43 @@ class ControllerBase(ABC):
         self.is_mock = not is_real
         self.PixelStrip: Type[MockPixelStrip] = PixelStrip
 
-    @abstractmethod
-    def get_pixel_count(self) -> int:
-        pass
+    def get_max_distance(self) -> float:
+        highest = 0
+
+        def distance_callback(distance: float, index: Tuple[int, int]) -> None:
+            nonlocal highest
+            if distance > highest:
+                highest = distance
+
+        self.map_distance(distance_callback)
+        return highest
 
     @abstractmethod
+    def map_coordinates(self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]) -> None:
+        pass
+
     def map_distance(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
-        pass
+        def coordinate_callback(x: float, y: float, index: Tuple[int, int]) -> Union[RGBW, None]:
+            return callback(math.sqrt(x**2 + y**2), index)
 
-    @abstractmethod
+        self.map_coordinates(coordinate_callback)
+
     def map_scaled_distance(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
-        pass
+        max_distance = self.get_max_distance()
+        self.map_distance(lambda distance, index: callback(
+            distance / max_distance, index))
 
-    @abstractmethod
     def map_angle(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         """Maps LEDs based on their angle from center (0,0) in radians.
         Angle 0 points right (positive x-axis), increases counter-clockwise."""
-        pass
+        def coordinate_callback(x: float, y: float, index: Tuple[int, int]) -> Union[RGBW, None]:
+            angle = math.atan2(y, x)
+            # Ensure angle is positive (0 to 2π instead of -π to π)
+            if angle < 0:
+                angle += 2 * math.pi
+            return callback(angle, index)
+
+        self.map_coordinates(coordinate_callback)
 
     @abstractmethod
     def show(self) -> None:
@@ -54,5 +75,5 @@ class ControllerBase(ABC):
         pass
 
     @abstractmethod
-    def get_config(self) -> Any:
+    def get_visualizer_config(self) -> Any:
         pass

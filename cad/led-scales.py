@@ -380,6 +380,6 @@ print("Panel count is ", config.panel_count, flush=True)
 print("Total dimensions are ", config.total_width,
       "x", config.total_height, flush=True)
 print("Square meters are ", config.total_area_m2, flush=True)
-print("Scale count is ", config.scale_count, flush=True)
+print("Scale count is ", config.get_led_count(), flush=True)
 print("Estimated weight is ", config.total_weight_kg, "kg", flush=True)
 print("Estimated filament price is €", config.total_price_eur, flush=True)
