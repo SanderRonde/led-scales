@@ -4,12 +4,14 @@ import sys
 import time
 import threading
 import logging
+import json
 from typing import Dict, Any, Union
+from pathlib import Path
 from flask import Flask, render_template, jsonify, send_from_directory, request  # pylint: disable=import-error
 from flask_socketio import SocketIO  # pylint: disable=import-error
-from leds import effects
 from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
+from leds.effects.rainbow_radial import RainbowRadialEffect
 from config import get_led_controller, BaseConfig, get_config
 # Add parent directory to Python path when running directly
 if __name__ == '__main__':
@@ -22,7 +24,7 @@ SLEEP_TIME_REAL = 0.01
 
 
 class LEDs:
-    def __init__(self, mock: bool, config: BaseConfig, effect_name: str):
+    def __init__(self, mock: bool, config: BaseConfig):
         self._app = Flask(__name__, static_folder=None)
         self.config = config
         self._socketio = SocketIO(self._app, cors_allowed_origins="*")
@@ -34,7 +36,12 @@ class LEDs:
         self._effects = get_effects(self._controller)
         self._running = False
 
-        self._effect = self.set_effect(effect_name)
+        # Try to load saved effect, fall back to RainbowRadialEffect if none exists
+        saved_effect = self._load_saved_effect()
+        if saved_effect and saved_effect in self._effects:
+            self._effect = self.set_effect(saved_effect)
+        else:
+            self._effect = self.set_effect(RainbowRadialEffect.__name__)
 
     def _get_sleep_time(self) -> float:
         if self._controller.is_mock:
@@ -100,6 +107,7 @@ class LEDs:
                                 param_name).set_value(param_value)
 
             self._running = True
+            self._save_current_effect()  # Save the effect when it's changed
             return jsonify({
                 'success': True
             })
@@ -115,10 +123,33 @@ class LEDs:
         self._socketio.run(self._app, port=self.config.web_port,  # type: ignore
                            debug=False, use_reloader=False)
 
+    def _get_effect_save_path(self) -> Path:
+        """Get the path where the current effect is saved"""
+        return Path.home() / ".led_effect.json"
+
+    def _save_current_effect(self) -> None:
+        """Save the current effect name to disk"""
+        save_path = self._get_effect_save_path()
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump({'effect_name': self._effect.__class__.__name__}, f)
+
+    def _load_saved_effect(self) -> Union[str, None]:
+        """Load the saved effect name from disk"""
+        save_path = self._get_effect_save_path()
+        if not save_path.exists():
+            return None
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('effect_name')
+        except (json.JSONDecodeError, KeyError):
+            return None
+
     def set_effect(self, effect_name: str) -> Effect:
         """Set the effect to run"""
         self._effect = self._effects[effect_name]
         self._running = True
+        self._save_current_effect()  # Save the effect when it's changed
         return self._effect
 
     def start(self) -> None:
@@ -140,7 +171,7 @@ class LEDs:
 def main() -> None:
     mock = "--mock" in sys.argv
 
-    leds = LEDs(mock, get_config(), effects.SingleColorRadialEffect.__name__)
+    leds = LEDs(mock, get_config())
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 
