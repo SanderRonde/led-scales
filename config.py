@@ -1,8 +1,8 @@
-import leds.controllers as controllers
-from dataclasses import dataclass, field
 from typing import Optional, Union, List, Tuple, Any, Dict
 from pathlib import Path
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from leds import controllers
 # Unless otherwise specified, all dimensions are in mm
 
 
@@ -150,8 +150,8 @@ class HexConfig(BaseConfig):
                         f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected integer")
 
             max_led_index = 0
-            for hex in self.hexagons:
-                max_led_index = max(max_led_index, max(hex.ordered_leds))
+            for hexagon in self.hexagons:
+                max_led_index = max(max_led_index, *hexagon.ordered_leds)
             if max_led_index != len(hexagon.ordered_leds) - 1:
                 raise ValueError(
                     f"Hexagon {hexagon.x}, {hexagon.y} has {len(hexagon.ordered_leds)} LEDs, expected {max_led_index + 1}")
@@ -174,7 +174,6 @@ def get_config() -> BaseConfig:
 def get_led_controller(mock: bool) -> controllers.ControllerBase:
     if isinstance(_config, ScaleConfig):  # type: ignore
         return controllers.ScalePanelLEDController(_config, mock)
-    elif isinstance(_config, HexConfig):  # type: ignore
+    if isinstance(_config, HexConfig):  # type: ignore
         return controllers.HexPanelLEDController(_config, mock)
-    else:
-        raise ValueError(f"Unknown config type: {type(_config)}")
+    raise ValueError(f"Unknown config type: {type(_config)}")

@@ -6,14 +6,14 @@
 # To auto watch and run:
 # bun x nodemon --exec "python led-scales.py" --watch "led-scales.py"
 
-from config import ScaleConfig
-import openpyscad as ops
 import math
 import subprocess
 import sys
 import os
 from enum import Enum
 from typing import Dict, Tuple, List
+import openpyscad as ops
+from config import ScaleConfig
 
 # Add parent directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,47 +21,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load configuration
 config = ScaleConfig()
-
-# Scale
-base_length = config.base_length
-base_width = config.base_width
-base_height = config.base_height
-spike_size = config.spike_size
-
-# Scale lean
-lean_base = config.lean_base
-lean_factor = config.lean_factor
-
-# Panel
-panel_spacing = config.spacing
-x_count = config.x_count
-y_count = config.y_count
-
-# Panel counts
-panel_count = config.panel_count
-
-# LED - not really but easier to drill
-led_diameter = config.led_template_diameter
-
-# Weight and price
-estimated_weight_g = config.estimated_weight_g
-price_per_kilo = config.price_per_kilo
-
-# Printing
-print_bed_spacing = config.print_bed_spacing
-x_print_bed = config.x_print_bed
-y_print_bed = config.y_print_bed
-x_print_spacing = config.x_print_spacing
-y_print_additional_spacing = config.y_print_additional_spacing
-print_outside_padding = config.print_outside_padding
-scad_path = config.scad_path
-x_per_build_plate_override = config.x_per_build_plate_override
-y_per_build_plate_override = config.y_per_build_plate_override
-
-# Debug
-is_fast = config.is_fast
-
-spike_height = config.spike_height
 
 
 class Mode(Enum):
@@ -72,22 +31,23 @@ class Mode(Enum):
 
 
 def scale_half():
-    sub_y_cube = ops.Cube([base_length, base_width, spike_height]
-                          ).translate([0, 0, -spike_height])
-    base = ops.Cube([base_length, base_width, spike_height])
-    spike = ops.Polygon(points=[[0, 0], [base_length, 0], [base_width, spike_height]], paths=[
-        [0, 1, 2]]).linear_extrude(height=base_width).rotate([90, 0, 0]).translate([0, base_width, spike_height])
-    tip = ops.Cube([base_width, base_width, spike_height]
-                   ).translate([0, 0, spike_height])
+    sub_y_cube = ops.Cube([config.base_length, config.base_width, config.spike_height]
+                          ).translate([0, 0, -config.spike_height])
+    base = ops.Cube(
+        [config.base_length, config.base_width, config.spike_height])
+    spike = ops.Polygon(points=[[0, 0], [config.base_length, 0], [config.base_width, config.spike_height]], paths=[
+        [0, 1, 2]]).linear_extrude(height=config.base_width).rotate([90, 0, 0]).translate([0, config.base_width, config.spike_height])
+    tip = ops.Cube([config.base_width, config.base_width, config.spike_height]
+                   ).translate([0, 0, config.spike_height])
     return sub_y_cube + base + spike + tip
 
 
 def lean_angle(distance: float):
-    return lean_base + (distance * lean_factor)
+    return config.lean_base + (distance * config.lean_factor)
 
 
-def scale_3d(distance: float):
-    size_of_scale = base_length + base_width
+def draw_scale_3d(distance: float):
+    size_of_scale = config.base_length + config.base_width
 
     scale = ops.Union()
     scale_mirror = scale_half().rotate([0, 0, -45])
@@ -96,41 +56,34 @@ def scale_3d(distance: float):
     return scale.rotate([0, -lean_angle(distance), 0]).translate([-math.sqrt(size_of_scale * size_of_scale / 2), 0, 0])
 
 
-def scale(mode: Mode, distance: float):
-    if mode == Mode.TWO_D or mode == Mode.POSITIONING:
-        result = Projection(cut=True).append(scale_3d(distance))
+def draw_scale(mode: Mode, distance: float):
+    if mode in [Mode.TWO_D, Mode.POSITIONING]:
+        result = Projection(cut=True).append(draw_scale_3d(distance))
         if mode != Mode.POSITIONING:
-            result = result + ops.Circle(d=led_diameter)
+            result = result + ops.Circle(d=config.led_template_diameter)
         return result
-    else:
-        return scale_3d(distance)
+    return draw_scale_3d(distance)
 
 
 def draw_panel(mode: Mode, scale_x_offset: int):
     coordinate_map: Dict[Tuple[float, float], float] = {}
 
     panel = ops.Union()
-    x_half = math.floor(x_count / 2)
-    y_half = math.floor(y_count / 2)
+    x_half = math.floor(config.x_count / 2)
+    y_half = math.floor(config.y_count / 2)
     for _i in range(-x_half, x_half):
         i = _i + scale_x_offset
         for j in range(-y_half, y_half):
-            distance: float = math.sqrt(i*i + j*j) * panel_spacing
+            distance: float = math.sqrt(i*i + j*j) * config.spacing
 
             coordinate_map[(i + 0.5, j)] = distance
-            panel.append(scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
-                j, i))]).translate([-(i * panel_spacing) - (panel_spacing / 2), -(j * panel_spacing), 0]))
+            panel.append(draw_scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
+                j, i))]).translate([-(i * config.spacing) - (config.spacing / 2), -(j * config.spacing), 0]))
             if i != -x_half:
                 coordinate_map[(i, j + 0.5)] = distance
-                panel.append(scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
-                    j + 0.5, i))]).translate([-(i * panel_spacing), -(j * panel_spacing) - (panel_spacing / 2), 0]))
+                panel.append(draw_scale(mode, distance).rotate([0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(
+                    j + 0.5, i))]).translate([-(i * config.spacing), -(j * config.spacing) - (config.spacing / 2), 0]))
     return (panel, coordinate_map)
-
-
-panel_width = config.panel_width
-panel_height = config.panel_height
-total_width = config.total_width
-total_height = config.total_height
 
 
 def draw(mode: Mode):
@@ -143,18 +96,18 @@ def draw(mode: Mode):
     panels.append(center_panel)
     result.append(center_panel)
 
-    for i in range(1, math.floor((panel_count - 1) / 2) + 1):
-        left_offset = i * x_count + config.panel_spacing_scales
+    for i in range(1, math.floor((config.panel_count - 1) / 2) + 1):
+        left_offset = i * config.x_count + config.panel_spacing_scales
         (left_panel, left_coordinate_map) = draw_panel(mode, left_offset)
         panels.append(left_panel.translate(
-            [left_offset * panel_spacing, 0, 0]))
+            [left_offset * config.spacing, 0, 0]))
         result.append(left_panel)
         joined_coordinate_map.update(left_coordinate_map)
 
-        right_offset = -(i * x_count) - config.panel_spacing_scales
+        right_offset = -(i * config.x_count) - config.panel_spacing_scales
         (right_panel, right_coordinate_map) = draw_panel(mode, right_offset)
         panels.append(right_panel.translate(
-            [right_offset * panel_spacing, 0, 0]))
+            [right_offset * config.spacing, 0, 0]))
         result.append(right_panel)
         joined_coordinate_map.update(right_coordinate_map)
 
@@ -162,7 +115,7 @@ def draw(mode: Mode):
 
 
 def x_offset_for_lean(lean: float):
-    c = base_height
+    c = config.base_height
     alpha = 90 - lean
     a = c * math.sin(math.radians(alpha))
     b = math.sqrt(c**2 - a**2)
@@ -175,9 +128,9 @@ def get_optimal_tile_x(distance_values: List[float], y_per_build_plate: int, tot
         max_lean = max(max_lean, lean_angle(d))
 
     x_lower_bound = math.floor(
-        (x_print_bed - x_offset_for_lean(total_max_lean)) / x_print_spacing)
+        (config.x_print_bed - x_offset_for_lean(total_max_lean)) / config.x_print_spacing)
     x_upper_bound = math.floor(
-        (x_print_bed) / x_print_spacing)
+        (config.x_print_bed) / config.x_print_spacing)
 
     for x in range(x_upper_bound, x_lower_bound, -1):
         included_distance_values = distance_values[:x * y_per_build_plate]
@@ -186,7 +139,8 @@ def get_optimal_tile_x(distance_values: List[float], y_per_build_plate: int, tot
             max_lean_for_included = max(max_lean_for_included, lean_angle(d))
 
         x_per_build_plate = math.floor(
-            (x_print_bed - x_offset_for_lean(max_lean_for_included)) / x_print_spacing
+            (config.x_print_bed - x_offset_for_lean(max_lean_for_included)) /
+            config.x_print_spacing
         )
         if x == x_per_build_plate:
             # This means that given this x, we can indeed fit all the scales
@@ -200,16 +154,16 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
     result = ops.Union()
 
     scale_small_side_length = math.sqrt(
-        ((base_length - (base_width / 2)) * (base_length - (base_width / 2))) / 2)
+        ((config.base_length - (config.base_width / 2)) * (config.base_length - (config.base_width / 2))) / 2)
     y_print_spacing = (scale_small_side_length * 2) + 6
     y_per_build_plate = math.floor(
-        (y_print_bed) / y_print_spacing)
-    if y_per_build_plate_override is not None:
-        y_per_build_plate = y_per_build_plate_override
+        (config.y_print_bed) / y_print_spacing)
+    if config.y_per_build_plate_override is not None:
+        y_per_build_plate = config.y_per_build_plate_override
 
     total_count = 0
     tile_count = 0
-    tiles: List[ops.Union] = list()
+    tiles: List[ops.Union] = []
     while True:
         tile = ops.Union()
         tiles.append(tile)
@@ -219,14 +173,14 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
         for _, d in distance_items:
             max_lean = max(max_lean, lean_angle(d))
 
-        tile_offset = tile_count * print_bed_spacing
+        tile_offset = tile_count * config.print_bed_spacing
         (max_x_offset, x_per_build_plate) = get_optimal_tile_x(
             [d for _, d in distance_items[total_count:]], y_per_build_plate, max_lean)
-        if x_per_build_plate_override is not None:
-            x_per_build_plate = x_per_build_plate_override
+        if config.x_per_build_plate_override is not None:
+            x_per_build_plate = config.x_per_build_plate_override
 
         if preview and mode != Mode.POSITIONING:
-            result.append(ops.Cube([x_print_bed, y_print_bed, 1]).translate(
+            result.append(ops.Cube([config.x_print_bed, config.y_print_bed, 1]).translate(
                 [tile_offset, 0, 0]).translate([
                     -scale_small_side_length,
                     -scale_small_side_length,
@@ -240,14 +194,14 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
 
                 key, d = distance_items[total_count]
                 translate_x = max_x_offset + \
-                    tile_offset + (x * x_print_spacing)
+                    tile_offset + (x * config.x_print_spacing)
                 translate_y = y * y_print_spacing
-                tile.append(scale(mode, d).translate(
+                tile.append(draw_scale(mode, d).translate(
                     [translate_x, translate_y, 0]))
 
                 if mode == Mode.POSITIONING:
-                    text = ops.Text('"{}"'.format(key), size=3, halign='"center"', valign='"center"').translate([translate_x, translate_y]).translate([
-                        -x_print_spacing / 2, 0, 0])
+                    text = ops.Text(f'"{key}"', size=3, halign='"center"', valign='"center"').translate([translate_x, translate_y]).translate([
+                        -config.x_print_spacing / 2, 0, 0])
                     text.turn_on_debug()
                     result.append(text)
 
@@ -257,48 +211,50 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
 
 def main(mode: Mode, preview: bool = False):
     (result, coordinate_map, _) = draw(mode)
-    if mode != Mode.PRINT and mode != Mode.POSITIONING:
+    if mode not in [Mode.PRINT, Mode.POSITIONING]:
         return result
     (printable_result, tiles) = printable(coordinate_map, mode, preview)
     if not preview:
         printable_result = printable_result - ops.Cube([
-            (print_bed_spacing * len(tiles)) * 1.5,
-            total_height * 1.5,
-            base_height * 1.5
-        ]).translate([(-total_width / 2) * 1.5, (-total_height / 2) * 1.5, -base_height * 1.5])
+            (config.print_bed_spacing * len(tiles)) * 1.5,
+            config.total_height * 1.5,
+            config.base_height * 1.5
+        ]).translate([(-config.total_width / 2) * 1.5, (-config.total_height / 2) * 1.5, -config.base_height * 1.5])
     return printable_result
 
 
 def to_stls(file_name: str):
     (_result, coordinate_map, _) = draw(Mode.PRINT)
     (_result, tiles) = printable(coordinate_map, Mode.PRINT, False)
-    for i in range(len(tiles)):
+    for i, tile in enumerate(tiles):
         negative = ops.Cube([
-            (print_bed_spacing * len(tiles)) * 3,
-            total_height * 1.5,
-            base_height * 1.5
-        ]).translate([(-total_width / 2) * 1.5, (-total_height / 2) * 1.5, -base_height * 1.5])
-        tile_out_path = "{}-{}.scad".format(file_name, i)
-        (tiles[i] - negative).write(tile_out_path)
+            (config.print_bed_spacing * len(tiles)) * 3,
+            config.total_height * 1.5,
+            config.base_height * 1.5
+        ]).translate([(-config.total_width / 2) * 1.5, (-config.total_height / 2) * 1.5, -config.base_height * 1.5])
+        tile_out_path = f"{file_name}-{i}.scad"
+        (tile - negative).write(tile_out_path)
         if "--3d" in sys.argv:
             print(
                 f"Converting SCAD file to STL for tile {i}/{len(tiles)} ({(i+1)/len(tiles)*100:.1f}%)...", flush=True)
-            subprocess.run([scad_path, "-o", "{}-{}.stl".format(file_name, i), tile_out_path],
+            subprocess.run([config.scad_path, "-o", f"{file_name}-{i}.stl", tile_out_path],
                            stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
+                           stderr=subprocess.DEVNULL,
+                           check=False)
 
 
 def to_panel_svgs(file_name: str):
     (_result, _coordinate_map, panels) = draw(Mode.TWO_D)
-    for i in range(len(panels)):
-        panel_out_path = "{}-{}.scad".format(file_name, i)
-        panels[i].write(panel_out_path)
+    for i, panel in enumerate(panels):
+        panel_out_path = f"{file_name}-{i}.scad"
+        panel.write(panel_out_path)
         if "--2d" in sys.argv:
             print(
                 f"Converting SCAD file to SVG for panel {i+1}/{len(panels)} ({(i+1)/len(panels)*100:.1f}%)...", flush=True)
-            subprocess.run([scad_path, "-o", "{}-{}.svg".format(file_name, i), panel_out_path],
+            subprocess.run([config.scad_path, "-o", f"{file_name}-{i}.svg", panel_out_path],
                            stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
+                           stderr=subprocess.DEVNULL,
+                           check=False)
 
 
 def diffusers(file_name: str):
@@ -319,15 +275,16 @@ def diffusers(file_name: str):
         [0, 0, config.led_diffuser_thickness - 0.5]))
 
     # Write to file
-    diffuser_path = os.path.join(out_dir, file_name + ".scad")
+    diffuser_path = os.path.join(out_dir, f"{file_name}.scad")
     diffuser.write(diffuser_path)
 
     if "--3d" in sys.argv:
         print(
-            f"Converting SCAD file to STL for diffuser...", flush=True)
-        subprocess.run([scad_path, "-o", "{}.stl".format(file_name), diffuser_path],
+            "Converting SCAD file to STL for diffuser...", flush=True)
+        subprocess.run([config.scad_path, "-o", f"{file_name}.stl", diffuser_path],
                        stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL)
+                       stderr=subprocess.DEVNULL,
+                       check=False)
 
 
 # This is not in the openpyscad library so we fix it here
@@ -335,7 +292,7 @@ ops.base.MetaObject.object_definition['projection'] = (
     'projection', ('cut', ), True)
 
 
-class Projection(ops.transformations._Transformation):
+class Projection(ops.transformations._Transformation):  # pylint: disable=protected-access
     pass
 
 
@@ -359,8 +316,8 @@ if not os.path.exists(diffuser_dir):
     os.makedirs(diffuser_dir)
     print(f"Created directory: {diffuser_dir}", flush=True)
 
-((scale(Mode.THREE_D, 0) - ops.Cube([100, 100, 100]).translate(
-    [-50, -50, -100])) + ops.Cylinder(d=led_diameter, h=1)).write(os.path.join(out_dir, "led-scales-py.single.scad"))
+((draw_scale(Mode.THREE_D, 0) - ops.Cube([100, 100, 100]).translate(
+    [-50, -50, -100])) + ops.Cylinder(d=config.led_template_diameter, h=1)).write(os.path.join(out_dir, "led-scales-py.single.scad"))
 main(Mode.THREE_D, preview=True).write(
     os.path.join(out_dir, "led-scales-py.scad"))
 main(Mode.TWO_D, preview=True).write(

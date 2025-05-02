@@ -1,11 +1,11 @@
+import math
 from typing import Any, List, Tuple, Dict, Callable, Union, TYPE_CHECKING
 from leds.color import RGBW
-from leds.mock import MockPixelStrip
 from leds.controllers.controller_base import ControllerBase
-import math
 
 if TYPE_CHECKING:
     from config import HexConfig, Hexagon
+    from leds.mock import MockPixelStrip  # pylint: disable=ungrouped-imports
 
 # Arbitrary number. What this number is doesn't matter, as long as it's consistent.
 HEX_SIZE = 100
@@ -43,19 +43,12 @@ class HexPanel:
 
 
 class HexPanelLEDController(ControllerBase):
-    def __init__(self, config: "HexConfig", mock: bool, **kwargs: Any):
+    def __init__(self, config: "HexConfig", mock: bool):
         super().__init__(mock)
 
         (pin, channel) = config.pins
-        self.strip = self.PixelStrip(
-            num=config.get_led_count(),
-            pin=pin,
-            brightness=255,
-            freq_hz=800000,
-            dma=10,
-            invert=False,
-            channel=channel
-        )
+        self.strip = ControllerBase.init_strip(
+            self.PixelStrip, config.get_led_count(), pin, channel)
         self.config = config
         self.panels: List[HexPanel] = [
             HexPanel(hexagon, self.strip) for hexagon in config.hexagons]
@@ -64,18 +57,6 @@ class HexPanelLEDController(ControllerBase):
         for panel in self.panels:
             self.max_x = max(self.max_x, (panel.panel_config.x + 1) * HEX_SIZE)
             self.max_y = max(self.max_y, (panel.panel_config.y + 1) * HEX_SIZE)
-        self._max_distance = self._get_max_distance()
-
-    def _get_max_distance(self) -> float:
-        highest = 0
-
-        def distance_callback(distance: float, index: Tuple[int, int]) -> None:
-            nonlocal highest
-            if distance > highest:
-                highest = distance
-
-        self.map_distance(distance_callback)
-        return highest
 
     def map_coordinates(self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         total_center_x = self.max_x / 2

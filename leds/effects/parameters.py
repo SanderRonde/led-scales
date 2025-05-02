@@ -1,6 +1,6 @@
 """Parameter definitions for LED effects"""
 from dataclasses import dataclass
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Optional
 from abc import ABC, abstractmethod
 from enum import Enum
 from leds.color import RGBW, Color
@@ -31,7 +31,7 @@ class Parameter(ABC):
     def get_value(self) -> Any:
         """Get the value of the parameter"""
         self.value = self.default
-        
+
     def set_value(self, value: Any):
         """Set the value of the parameter"""
         self.value = value
@@ -68,7 +68,7 @@ class ColorParameter(Parameter):
     def get_value(self) -> RGBW:
         """Get the value of the parameter"""
         return self.value
-    
+
     def set_value(self, value: Dict[str, int]):
         """Set the value of the parameter"""
         self.value = Color(value['r'], value['g'], value['b'])
@@ -80,9 +80,9 @@ class EnumParameter(Parameter):
     enum_values: List[str] = []
     type: ParameterType = ParameterType.ENUM
 
-    def __init__(self, default: str = "", description: str = "", enum_values: List[str] = []):
+    def __init__(self, default: str = "", description: str = "", enum_values: Optional[List[str]] = None):
         super().__init__(default, description)
-        self.enum_values = enum_values
+        self.enum_values = enum_values or []
 
     def get_value(self) -> str:
         """Get the value of the parameter"""
@@ -100,8 +100,9 @@ class ColorListParameter(Parameter):
     default: List[RGBW] = []
     type: ParameterType = ParameterType.COLOR_LIST
 
-    def __init__(self, default: List[RGBW] = [], description: str = ""):
+    def __init__(self, default: Optional[List[RGBW]] = None, description: str = ""):
         super().__init__(default, description)
+        self.default = default or []
 
     def get_value(self) -> List[RGBW]:
         """Get the value of the parameter"""
@@ -109,5 +110,5 @@ class ColorListParameter(Parameter):
 
     def set_value(self, value: List[Dict[str, int]]):
         """Set the value of the parameter"""
-        self.value = [Color(color['r'], color['g'], color['b']) for color in value]
-
+        self.value = [Color(color['r'], color['g'], color['b'])
+                      for color in value]

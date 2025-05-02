@@ -1,36 +1,27 @@
-from leds.effects.parameters import ColorParameter, FloatParameter, EnumParameter
-from leds.controllers.controller_base import ControllerBase
-from leds.effects.effect import Effect
-from leds.color import RGBW, Color
 import math
+from leds.controllers.controller_base import ControllerBase
+from leds.effects.parameters import ColorParameter, FloatParameter
+from leds.effects.effect import Effect, SpeedParameters
+from leds.color import RGBW, Color
 
 
-class SingleColorRadialParameters:
+class SingleColorRadialParameters(SpeedParameters):
     def __init__(self):
+        super().__init__()
         self.color = ColorParameter(
             default=Color(255, 0, 0),
             description="Color of the effect",
-        )
-        self.speed = FloatParameter(
-            default=0.6,
-            description="Speed of the effect (0-1)",
         )
         self.lower_bound = FloatParameter(
             default=0.5,
             description="Lower bound of the effect (0-1)",
         )
-        self.direction = EnumParameter(
-            default="out",
-            description="Direction of the effect",
-            enum_values=["in", "out"]
-        )
 
 
 class SingleColorRadialEffect(Effect):
-    PARAMETERS = SingleColorRadialParameters()
-
     def __init__(self, controller: ControllerBase):
         super().__init__(controller)
+        self.PARAMETERS = SingleColorRadialParameters()
 
     def color_at_distance(self, distance: float) -> RGBW:
         lower_bound = self.PARAMETERS.lower_bound.get_value()
@@ -45,7 +36,7 @@ class SingleColorRadialEffect(Effect):
         )
 
     def run(self, ms: int):
-        offset = self.time_offset(
+        offset = Effect.time_offset(
             ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value())
         self.controller.map_scaled_distance(lambda distance, index: self.color_at_distance(
             ((distance) + offset) % 1))

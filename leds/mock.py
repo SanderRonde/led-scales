@@ -1,9 +1,9 @@
-from typing import Any, List
+from typing import List, Any
 from leds.color import RGBW
 
 
 class MockPixelStrip:
-    def __init__(self, num: int, brightness: int = 255, **kwargs: Any):
+    def __init__(self, num: int, brightness: int = 255, **kwargs: Any):  # pylint: disable=unused-argument
         self.num_pixels = num
         self._pixels: List[RGBW] = [RGBW(0, 0, 0, 0) for _ in range(num)]
         self._buffer: List[RGBW] = [RGBW(0, 0, 0, 0) for _ in range(num)]

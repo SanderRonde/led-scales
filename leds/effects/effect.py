@@ -1,8 +1,22 @@
 """Base class for LED effects"""
-from leds.controllers.controller_base import ControllerBase
-from leds.color import RGBW
 from abc import ABC, abstractmethod
 from typing import Any
+from leds.controllers.controller_base import ControllerBase
+from leds.color import RGBW
+from leds.effects.parameters import FloatParameter, EnumParameter
+
+
+class SpeedParameters(ABC):
+    def __init__(self):
+        self.speed = FloatParameter(
+            default=0.6,
+            description="Speed of the effect (0-1)",
+        )
+        self.direction = EnumParameter(
+            default="out",
+            description="Direction of the effect",
+            enum_values=["in", "out"]
+        )
 
 
 class Effect(ABC):
@@ -16,7 +30,8 @@ class Effect(ABC):
     def run(self, ms: int):
         pass
 
-    def interpolate_color(self, from_color: RGBW, to_color: RGBW, value: float) -> RGBW:
+    @staticmethod
+    def interpolate_color(from_color: RGBW, to_color: RGBW, value: float) -> RGBW:
         """Interpolate between two colors using HSV color space for smoother transitions
         Args:
             from_color (RGBW): Starting color
@@ -48,7 +63,8 @@ class Effect(ABC):
         # Convert back to RGBW
         return RGBW.from_hsv(h, s, v, w)
 
-    def time_offset(self, ms: int, speed: float, direction: str) -> float:
+    @staticmethod
+    def time_offset(ms: int, speed: float, direction: str) -> float:
         min_sensitivity = 100  # Repeat every 100ms
         max_sensitivity = 1000 * 60 * 5  # Repeat every 5 minutes
         # Use exponential scaling to make sensitivity feel more natural
@@ -59,7 +75,8 @@ class Effect(ABC):
             return -offset
         return offset
 
-    def rainbow(self, value: float) -> RGBW:
+    @staticmethod
+    def rainbow(value: float) -> RGBW:
         value = value % 1
         # Convert directly to HSV for smoother rainbow transitions
         return RGBW.from_hsv(value * 360, 1.0, 1.0)

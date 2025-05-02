@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 class LEDPanel:
-    def __init__(self, PixelStrip: Type[MockPixelStrip], config: "ScaleConfig", index: int, brightness: int = 255, **kwargs: Any):
+    def __init__(self, PixelStrip: Type[MockPixelStrip], config: "ScaleConfig", index: int, brightness: int = 255):
         self.num_pixels = config.scale_per_panel_count
         self.index = index
         self.config = config
@@ -18,23 +18,15 @@ class LEDPanel:
                                     for _ in range(self.num_pixels)]
         self._brightness = brightness
         pin, channel = config.pins[index]
-        self.strip = PixelStrip(
-            num=self.num_pixels,
-            pin=pin,
-            brightness=255,
-            freq_hz=800000,
-            dma=10,
-            invert=False,
-            channel=channel
-        )
+        self.strip = ControllerBase.init_strip(
+            PixelStrip, self.num_pixels, pin, channel)
 
     @property
     def distance_from_center(self) -> int:
         center_panel = int((self.config.panel_count - 1) / 2)
         if self.index == center_panel:
             return 0
-        else:
-            return self.index - center_panel
+        return self.index - center_panel
 
     def get_base_x(self) -> float:
         distance_from_center = self.distance_from_center

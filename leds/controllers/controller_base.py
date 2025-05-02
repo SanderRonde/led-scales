@@ -1,8 +1,8 @@
 from typing import Type, Any, Tuple, Callable, Union
+from abc import ABC, abstractmethod
 import math
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
-from abc import ABC, abstractmethod
 # Try to import the real library first
 try:
     from rpi_ws281x import PixelStrip as RealPixelStrip  # type: ignore
@@ -18,8 +18,7 @@ def get_library(mock: bool) -> Tuple[Type[Any], bool]:
 
     if mock:
         return (MockPixelStrip, False)
-    else:
-        return (RealPixelStrip, True)  # type: ignore
+    return (RealPixelStrip, True)  # type: ignore
 
 
 class ControllerBase(ABC):
@@ -28,13 +27,24 @@ class ControllerBase(ABC):
         self.is_mock = not is_real
         self.PixelStrip: Type[MockPixelStrip] = PixelStrip
 
+    @staticmethod
+    def init_strip(PixelStrip: Type[MockPixelStrip], led_count: int, pin: int, channel: int):
+        return PixelStrip(
+            num=led_count,
+            pin=pin,
+            brightness=255,
+            freq_hz=800000,
+            dma=10,
+            invert=False,
+            channel=channel
+        )
+
     def get_max_distance(self) -> float:
         highest = 0
 
-        def distance_callback(distance: float, index: Tuple[int, int]) -> None:
+        def distance_callback(distance: float, index: Tuple[int, int]) -> None:  # pylint: disable=unused-argument
             nonlocal highest
-            if distance > highest:
-                highest = distance
+            highest = max(highest, distance)
 
         self.map_distance(distance_callback)
         return highest

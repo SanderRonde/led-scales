@@ -21,3 +21,4 @@ werkzeug==3.1.3
 zipp==3.21.0
 Flask-SocketIO==5.3.6
 python-socketio==5.11.1
+pylint==3.1.0

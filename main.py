@@ -33,6 +33,7 @@ PACKAGE_CONFIG = {
     },
 }
 
+
 def print_output(pipe: TextIO) -> None:
     for line in iter(pipe.readline, ''):
         if line.strip():  # Only print non-empty lines
@@ -40,50 +41,52 @@ def print_output(pipe: TextIO) -> None:
             print(line.strip(), flush=True)
 
 
-def run_command(command: Union[str, List[str]], shell: bool = True) -> None:
-    print(f"Running: {command}", flush=True)
+def run_command(cmd: Union[str, List[str]], shell: bool = True) -> None:
+    print(f"Running: {cmd}", flush=True)
     try:
         # Use Popen instead of run to have more control over the process
-        process = subprocess.Popen(
-            command,
+        with subprocess.Popen(
+            cmd,
             shell=shell,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,  # Line buffered
             universal_newlines=True
-        )
+        ) as process:
+            # Start threads to read stdout and stderr
+            stdout_thread = threading.Thread(
+                target=print_output, args=(process.stdout,))
+            stderr_thread = threading.Thread(
+                target=print_output, args=(process.stderr,))
 
-        # Start threads to read stdout and stderr
-        stdout_thread = threading.Thread(
-            target=print_output, args=(process.stdout,))
-        stderr_thread = threading.Thread(
-            target=print_output, args=(process.stderr,))
+            stdout_thread.start()
+            stderr_thread.start()
 
-        stdout_thread.start()
-        stderr_thread.start()
+            # Wait for the process to complete, but allow keyboard interrupts
+            while True:
+                try:
+                    return_code = process.poll()
+                    if return_code is not None:
+                        # Wait for output threads to finish
+                        stdout_thread.join()
+                        stderr_thread.join()
 
-        # Wait for the process to complete, but allow keyboard interrupts
-        while True:
-            try:
-                return_code = process.poll()
-                if return_code is not None:
-                    # Wait for output threads to finish
-                    stdout_thread.join()
-                    stderr_thread.join()
-
-                    if return_code != 0:
-                        print(
-                            f"Error: Command failed with exit code {return_code}", flush=True)
-                        sys.exit(1)
-                    break
-            except KeyboardInterrupt:
-                # Send SIGINT to the process group
-                if sys.platform == "win32":
-                    process.terminate()
-                else:
-                    os.killpg(os.getpgid(process.pid), signal.SIGINT)
-                raise
+                        if return_code != 0:
+                            print(
+                                f"Error: Command failed with exit code {return_code}", flush=True)
+                            sys.exit(1)
+                        break
+                except KeyboardInterrupt:
+                    # Send SIGINT to the process group
+                    if sys.platform == "win32":
+                        process.terminate()
+                    else:
+                        if hasattr(os, 'killpg'):
+                            os.killpg(os.getpgid(process.pid), signal.SIGINT)
+                        else:
+                            process.terminate()
+                    raise
     except KeyboardInterrupt:
         print("\nProcess interrupted by user", flush=True)
         sys.exit(1)
@@ -123,6 +126,7 @@ def generate_cad(mode: str = "") -> None:
     run_command(cmd)
     print("CAD generation complete! Files can be found in the cad/out directory")
 
+
 def run_leds(mock: bool = False) -> None:
     print("Running LED implementation...")
     if sys.platform == "win32":
@@ -132,6 +136,7 @@ def run_leds(mock: bool = False) -> None:
         activate_script = "venv/bin/activate"
         cmd = f'. "{activate_script}" && leds {"--mock" if mock else ""}'
     run_command(cmd)
+
 
 def clean() -> None:
     print("Cleaning up...")
@@ -155,18 +160,29 @@ def clean() -> None:
     print("Cleanup complete!")
 
 
-def help() -> None:
+def lint() -> None:
+    """Run pylint on the codebase"""
+    print("Running pylint...")
+    if sys.platform == "win32":
+        cmd = 'venv\\Scripts\\Python.exe -m pylint --rcfile=.pylintrc leds/ cad/ main.py config.py'
+    else:
+        cmd = 'venv/bin/python -m pylint --rcfile=.pylintrc leds/ cad/ main.py config.py'
+    run_command(cmd)
+
+
+def print_help() -> None:
     print("LED Scales CAD Generator:")
-    print("  python setup.py setup    - Set up the development environment")
-    print("  python setup.py generate - Generate CAD files (default mode)")
-    print("  python setup.py 3d       - Generate 3D printable STL files for the scales")
-    print("  python setup.py 2d       - Generate 2D SVG files for laser cutting/CNC")
-    print("  python setup.py clean    - Clean up generated files and environment")
-    print("  python setup.py all      - Generate all needed files")
-    print("  python setup.py help     - Show this help message")
-    print("  python setup.py leds     - Run the LED implementation")
-    print("  python setup.py leds-mock - Run the LED implementation in mock mode")
-    print("  python setup.py dev      - Run the server in development mode with auto-reload")
+    print("  python main.py setup    - Set up the development environment")
+    print("  python main.py generate - Generate CAD files (default mode)")
+    print("  python main.py 3d       - Generate 3D printable STL files for the scales")
+    print("  python main.py 2d       - Generate 2D SVG files for laser cutting/CNC")
+    print("  python main.py clean    - Clean up generated files and environment")
+    print("  python main.py all      - Generate all needed files")
+    print("  python main.py help     - Show this help message")
+    print("  python main.py leds     - Run the LED implementation")
+    print("  python main.py leds-mock - Run the LED implementation in mock mode")
+    print("  python main.py dev      - Run the server in development mode with auto-reload")
+    print("  python main.py lint     - Run pylint on the codebase")
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -180,6 +196,7 @@ SETUPTOOLS_COMMANDS = {
     'install_headers', 'install_scripts', 'install_data', 'install_egg_info'
 }
 
+
 class RestartHandler(FileSystemEventHandler):
     def __init__(self):
         self.process = None
@@ -192,26 +209,29 @@ class RestartHandler(FileSystemEventHandler):
 
         # Start new process
         print("\nStarting server...")
-        
+
         # Use python from venv
-        python_executable = os.path.join("venv", "Scripts", "python.exe") if sys.platform == "win32" else os.path.join("venv", "bin", "python")
-        
+        python_executable = os.path.join(
+            "venv", "Scripts", "python.exe") if sys.platform == "win32" else os.path.join("venv", "bin", "python")
+
         cmd = [python_executable, '-m', 'leds.leds', '--mock']
-        self.process = subprocess.Popen(
+        self.process = subprocess.Popen( # pylint: disable=consider-using-with
             cmd,
-            preexec_fn=None if sys.platform == "win32" else os.setsid
+            start_new_session=sys.platform != "win32"
         )
 
     def stop_process(self):
         if self.process:
             try:
                 if sys.platform == "win32":
-                    subprocess.run(['taskkill', '/F', '/T', '/PID', str(self.process.pid)])
+                    subprocess.run(
+                        ['taskkill', '/F', '/T', '/PID', str(self.process.pid)], check=False)
                 else:
-                    pgid = os.getpgid(self.process.pid)
-                    os.killpg(pgid, signal.SIGTERM)
-                    # Give it a moment to terminate gracefully
-                    self.process.wait(timeout=1)
+                    if hasattr(os, 'killpg'):
+                        pgid = os.getpgid(self.process.pid)
+                        os.killpg(pgid, signal.SIGTERM)
+                    else:
+                        self.process.terminate()
             except (ProcessLookupError, subprocess.TimeoutExpired):
                 # Process already terminated or timeout waiting for it
                 pass
@@ -228,14 +248,15 @@ class RestartHandler(FileSystemEventHandler):
                 print("\nRestarting server due to file change...")
                 self.start_process()
 
+
 def dev() -> None:
     """Run the server in development mode with auto-reload"""
     print("Starting development server with auto-reload...")
-    
+
     # Set up file watching
     event_handler = RestartHandler()
     observer = Observer()
-    
+
     # Watch Python files
     observer.schedule(event_handler, ".", recursive=True)
     observer.start()
@@ -253,13 +274,14 @@ def dev() -> None:
         observer.join()
         print("Server stopped")
 
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        help()
+        print_help()
         sys.exit(1)
 
     command = sys.argv[1]
-    
+
     # If it's a setuptools command, let setuptools handle it
     if command in SETUPTOOLS_COMMANDS:
         setup(**PACKAGE_CONFIG)  # type: ignore
@@ -275,13 +297,15 @@ if __name__ == "__main__":
     elif command == "clean":
         clean()
     elif command == "help":
-        help()
+        print_help()
     elif command == "leds":
         run_leds()
     elif command == "leds-mock":
         run_leds(True)
     elif command == "dev":
         dev()  # New development mode with auto-reload
+    elif command == "lint":
+        lint()  # New lint command
     elif command == "all":
         print("Generating 3D print files...")
         generate_cad("--3d")
@@ -293,7 +317,7 @@ if __name__ == "__main__":
         print("Done!")
     else:
         print(f"Unknown command: {command}")
-        help()
+        print_help()
         sys.exit(1)
 else:
     # When imported as a module, always run setup

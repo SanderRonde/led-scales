@@ -5,9 +5,9 @@ import time
 import threading
 import logging
 from typing import Dict, Any, Union
-from flask import Flask, render_template, jsonify, send_from_directory, request
-from flask_socketio import SocketIO
-from leds.effects import SingleColorRadialEffect, get_effects
+from flask import Flask, render_template, jsonify, send_from_directory, request  # pylint: disable=import-error
+from flask_socketio import SocketIO  # pylint: disable=import-error
+from leds.effects import Effect, SingleColorRadialEffect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
 from config import get_led_controller, BaseConfig, get_config
 
@@ -22,7 +22,7 @@ SLEEP_TIME_REAL = 0.01
 
 
 class LEDs:
-    def __init__(self, mock: bool, config: BaseConfig):
+    def __init__(self, mock: bool, config: BaseConfig, effect_name: str):
         self._app = Flask(__name__, static_folder=None)
         self.config = config
         self._socketio = SocketIO(self._app, cors_allowed_origins="*")
@@ -34,19 +34,20 @@ class LEDs:
         self._effects = get_effects(self._controller)
         self._running = False
 
+        self._effect = self.set_effect(effect_name)
+
     def _get_sleep_time(self) -> float:
         if self._controller.is_mock:
             return SLEEP_TIME_MOCK
-        else:
-            return SLEEP_TIME_REAL
+        return SLEEP_TIME_REAL
 
     def _init_routes(self) -> None:
         @self._app.route('/')
-        def home():  # type: ignore
+        def home():  # type: ignore  # pylint: disable=unused-variable
             return render_template('visualizer.html')
 
         @self._app.route('/static/<path:filename>')
-        def static_files(filename: str):  # type: ignore
+        def static_files(filename: str):  # type: ignore  # pylint: disable=unused-variable
             static_dir = os.path.join(os.path.dirname(__file__), 'static')
             response = send_from_directory(static_dir, filename)
 
@@ -66,11 +67,11 @@ class LEDs:
             return response
 
         @self._app.route('/effects')
-        def get_effects_route():  # type: ignore Renamed to avoid conflict
+        def get_effects_route():  # type: ignore  # pylint: disable=unused-variable
             return jsonify(get_all_effects_parameters(self._effects))
 
         @self._app.route('/effects', methods=['POST'])
-        def set_effect():  # type: ignore
+        def set_effect():  # type: ignore  # pylint: disable=unused-variable
             data: Dict[str, Any] = request.get_json() or {}
             effect_name: Union[str, None] = data.get('effect_name')
             if not effect_name:
@@ -99,7 +100,7 @@ class LEDs:
             })
 
         @self._app.route('/config')
-        def get_config():  # type: ignore
+        def get_visualizer_config():  # type: ignore  # pylint: disable=unused-variable
             return jsonify(self._controller.get_visualizer_config())
 
     def listen(self) -> None:
@@ -109,10 +110,11 @@ class LEDs:
         self._socketio.run(self._app, port=self.config.web_port,  # type: ignore
                            debug=False, use_reloader=False)
 
-    def set_effect(self, effect_name: str):
+    def set_effect(self, effect_name: str) -> Effect:
         """Set the effect to run"""
         self._effect = self._effects[effect_name]
         self._running = True
+        return self._effect
 
     def start(self) -> None:
         """Start the LED effect in a background thread"""
@@ -126,15 +128,14 @@ class LEDs:
                     'led_update', self._controller.json(), namespace='/')
                 time.sleep(self._get_sleep_time())
 
-        self._effect_thread = threading.Thread(target=run_effect, daemon=True)
-        self._effect_thread.start()
+        effect_thread = threading.Thread(target=run_effect, daemon=True)
+        effect_thread.start()
 
 
 def main() -> None:
     mock = "--mock" in sys.argv
 
-    leds = LEDs(mock, get_config())
-    leds.set_effect(SingleColorRadialEffect.__name__)
+    leds = LEDs(mock, get_config(), SingleColorRadialEffect.__name__)
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 

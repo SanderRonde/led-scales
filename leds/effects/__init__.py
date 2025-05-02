@@ -1,10 +1,10 @@
+from typing import Dict
 from leds.effects.rainbow_radial import RainbowRadialEffect
 from leds.effects.single_color_radial import SingleColorRadialEffect
 from leds.effects.multi_color_radial import MultiColorRadialEffect
 from leds.effects.rainbow import RainbowEffect
 from leds.controllers.controller_base import ControllerBase
 from leds.effects.effect import Effect
-from typing import Dict
 from leds.controllers.scale_panel_controller import ScalePanelLEDController
 
 
