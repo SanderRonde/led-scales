@@ -1,9 +1,9 @@
+from functools import cache
 from typing import Type, Any, Tuple, Callable, Union
 from abc import ABC, abstractmethod
 import math
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
-from functools import cache
 # Try to import the real library first
 try:
     from rpi_ws281x import PixelStrip as RealPixelStrip  # type: ignore
