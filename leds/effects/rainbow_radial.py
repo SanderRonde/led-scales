@@ -1,8 +1,8 @@
-from leds.effects.effect import Effect, SpeedParameters
+from leds.effects.effect import Effect, SpeedWithDirectionParameters
 from leds.controllers.controller_base import ControllerBase
 
 
-class RainbowRadialParameters(SpeedParameters):
+class RainbowRadialParameters(SpeedWithDirectionParameters):
     pass
 
 

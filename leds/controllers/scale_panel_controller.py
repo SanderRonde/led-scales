@@ -35,6 +35,10 @@ class LEDPanel:
         ) + 0.5
         return scale_offset
 
+    def set_color(self, color: RGBW) -> None:
+        for i in range(self.num_pixels):
+            self._buffer[i] = color
+
 
 class ScalePanelLEDController(ControllerBase):
     def __init__(self, config: "ScaleConfig", mock: bool, **kwargs: Any):
@@ -68,6 +72,10 @@ class ScalePanelLEDController(ControllerBase):
                             panel.strip.setPixelColor(led_index, color)
                         led_index += 1
                     y += 1
+
+    def set_color(self, color: RGBW) -> None:
+        for panel in self.panels:
+            panel.set_color(color)
 
     def show(self):
         for panel in self.panels:

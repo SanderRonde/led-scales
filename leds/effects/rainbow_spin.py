@@ -1,8 +1,8 @@
-from leds.effects.effect import Effect, SpeedParameters
+from leds.effects.effect import Effect, SpeedWithDirectionParameters
 from leds.controllers.hex_controller import HexPanelLEDController
 
 
-class RainbowSpinParameters(SpeedParameters):
+class RainbowSpinParameters(SpeedWithDirectionParameters):
     pass
 
 

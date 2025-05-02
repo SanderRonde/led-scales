@@ -1,6 +1,7 @@
 """Base class for LED effects"""
+import random
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Literal
 from leds.controllers.controller_base import ControllerBase
 from leds.color import RGBW
 from leds.effects.parameters import FloatParameter, EnumParameter
@@ -8,15 +9,53 @@ from leds.effects.parameters import FloatParameter, EnumParameter
 
 class SpeedParameters(ABC):
     def __init__(self):
+        super().__init__()
         self.speed = FloatParameter(
             default=0.6,
             description="Speed of the effect (0-1)",
         )
+
+
+class ColorInterpolationParameters(ABC):
+    def __init__(self):
+        super().__init__()
+        self.interpolation = EnumParameter(
+            default="linear",
+            description="Color interpolation of the effect",
+            enum_values=["linear", "hsv"]
+        )
+        
+
+
+class SpeedWithDirectionParameters(SpeedParameters, ABC):
+    def __init__(self):
+        super().__init__()
         self.direction = EnumParameter(
             default="out",
             description="Direction of the effect",
             enum_values=["in", "out"]
         )
+
+
+class ColorMigration:
+    def __init__(self):
+        self.to_color = RGBW.from_hsv(random.uniform(0, 360), 1, 1)
+        self.re_init(0.0)
+
+    def re_init(self, time_offset: float):
+        self.from_color = self.to_color
+        self.to_color = RGBW.from_hsv(random.uniform(0, 360), 1, 1)
+        self.random_offset = random.uniform(0, 0.5)
+        self.base_offset = time_offset
+
+    def run_iteration(self, value: float, interpolation: Literal["linear", "hsv"]) -> RGBW:
+        time_offset_base = self.base_offset + self.random_offset
+        relative_time_offset = value - time_offset_base
+        color = Effect.interpolate_color(
+            self.from_color, self.to_color, relative_time_offset, interpolation)
+        if relative_time_offset >= 1:
+            self.re_init(value)
+        return color
 
 
 class Effect(ABC):
@@ -31,7 +70,7 @@ class Effect(ABC):
         pass
 
     @staticmethod
-    def interpolate_color(from_color: RGBW, to_color: RGBW, value: float) -> RGBW:
+    def __interpolate_color_hsv(from_color: RGBW, to_color: RGBW, value: float) -> RGBW:
         """Interpolate between two colors using HSV color space for smoother transitions
         Args:
             from_color (RGBW): Starting color
@@ -64,13 +103,47 @@ class Effect(ABC):
         return RGBW.from_hsv(h, s, v, w)
 
     @staticmethod
-    def time_offset(ms: int, speed: float, direction: str) -> float:
+    def __interpolate_color_linear(from_color: RGBW, to_color: RGBW, value: float) -> RGBW:
+        """
+        Interpolate between two colors using linear RGB interpolation for pastel transitions
+        Args:
+            from_color (RGBW): Starting color
+            to_color (RGBW): Ending color
+            value (float): Interpolation value between 0 and 1
+        Returns:
+            RGBW: Interpolated color
+        """
+        # Linearly interpolate each RGB component
+        r = int(from_color.r + (to_color.r - from_color.r) * value)
+        g = int(from_color.g + (to_color.g - from_color.g) * value)
+        b = int(from_color.b + (to_color.b - from_color.b) * value)
+        w = int(from_color.w + (to_color.w - from_color.w) * value)
+
+        # Ensure values are within valid range
+        r = max(0, min(255, r))
+        g = max(0, min(255, g))
+        b = max(0, min(255, b))
+        w = max(0, min(255, w))
+
+        return RGBW(r, g, b, w)
+
+    @staticmethod
+    def interpolate_color(from_color: RGBW, to_color: RGBW, value: float, interpolation: Literal["linear", "hsv"]) -> RGBW:
+        if interpolation == "hsv":
+            return Effect.__interpolate_color_hsv(from_color, to_color, value)
+        return Effect.__interpolate_color_linear(from_color, to_color, value)
+
+    @staticmethod
+    def time_offset(ms: int, speed: float, direction: str = 'in', mod: bool = True) -> float:
         min_sensitivity = 100  # Repeat every 100ms
         max_sensitivity = 1000 * 60 * 5  # Repeat every 5 minutes
         # Use exponential scaling to make sensitivity feel more natural
         actual_sensitivity = min_sensitivity * \
             pow(max_sensitivity/min_sensitivity, 1 - speed)
-        offset = (ms % actual_sensitivity) / actual_sensitivity
+        if mod:
+            offset = (ms % actual_sensitivity) / actual_sensitivity
+        else:
+            offset = ms / actual_sensitivity
         if direction == 'out':
             return -offset
         return offset

@@ -41,6 +41,10 @@ class HexPanel:
         angle = self.get_angle_at_index(index)
         return round((HEX_SIZE * 0.9) * -math.sin(math.radians(angle))), round((HEX_SIZE * 0.9) * math.cos(math.radians(angle)))
 
+    def set_color(self, color: RGBW):
+        for index in self.panel_config.ordered_leds:
+            self.strip.setPixelColor(index, color)
+
 
 class HexPanelLEDController(ControllerBase):
     def __init__(self, config: "HexConfig", mock: bool):
@@ -73,6 +77,10 @@ class HexPanelLEDController(ControllerBase):
                                  relative_y - total_center_y, (panel_index, led_index))
                 if color is not None:
                     panel.strip.setPixelColor(led_index, color)
+
+    def set_color(self, color: RGBW) -> None:
+        for panel in self.panels:
+            panel.set_color(color)
 
     def show(self):
         for panel in self.panels:

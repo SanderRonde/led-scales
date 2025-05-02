@@ -1,8 +1,8 @@
-from leds.effects.effect import Effect, SpeedParameters
+from leds.effects.effect import Effect, SpeedWithDirectionParameters
 from leds.controllers.scale_panel_controller import ScalePanelLEDController
 
 
-class RainbowParameters(SpeedParameters):
+class RainbowParameters(SpeedWithDirectionParameters):
     pass
 
 

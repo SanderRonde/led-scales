@@ -1,11 +1,11 @@
 import math
 from leds.controllers.controller_base import ControllerBase
 from leds.effects.parameters import ColorParameter, FloatParameter
-from leds.effects.effect import Effect, SpeedParameters
+from leds.effects.effect import Effect, SpeedWithDirectionParameters
 from leds.color import RGBW, Color
 
 
-class SingleColorRadialParameters(SpeedParameters):
+class SingleColorRadialParameters(SpeedWithDirectionParameters):
     def __init__(self):
         super().__init__()
         self.color = ColorParameter(

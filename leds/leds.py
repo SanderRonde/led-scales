@@ -7,10 +7,10 @@ import logging
 from typing import Dict, Any, Union
 from flask import Flask, render_template, jsonify, send_from_directory, request  # pylint: disable=import-error
 from flask_socketio import SocketIO  # pylint: disable=import-error
-from leds.effects import Effect, SingleColorRadialEffect, get_effects
+from leds import effects
+from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
 from config import get_led_controller, BaseConfig, get_config
-
 # Add parent directory to Python path when running directly
 if __name__ == '__main__':
     sys.path.append(os.path.dirname(
@@ -139,7 +139,7 @@ class LEDs:
 def main() -> None:
     mock = "--mock" in sys.argv
 
-    leds = LEDs(mock, get_config(), SingleColorRadialEffect.__name__)
+    leds = LEDs(mock, get_config(), effects.SingleColorRadialEffect.__name__)
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 

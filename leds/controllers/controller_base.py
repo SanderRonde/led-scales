@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import math
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
+from functools import cache
 # Try to import the real library first
 try:
     from rpi_ws281x import PixelStrip as RealPixelStrip  # type: ignore
@@ -39,6 +40,7 @@ class ControllerBase(ABC):
             channel=channel
         )
 
+    @cache  # pylint: disable=method-cache-max-size-none
     def get_max_distance(self) -> float:
         highest = 0
 
@@ -49,6 +51,26 @@ class ControllerBase(ABC):
         self.map_distance(distance_callback)
         return highest
 
+    @cache  # pylint: disable=method-cache-max-size-none
+    def get_x_y_limits(self) -> Tuple[float, float, float, float]:
+        highest_x = 0
+        highest_y = 0
+        lowest_x = 0
+        lowest_y = 0
+
+        def x_callback(x: float, y: float, index: Tuple[int, int]) -> None:  # pylint: disable=unused-argument
+            nonlocal highest_x
+            nonlocal highest_y
+            nonlocal lowest_x
+            nonlocal lowest_y
+            highest_x = max(highest_x, x)
+            highest_y = max(highest_y, y)
+            lowest_x = min(lowest_x, x)
+            lowest_y = min(lowest_y, y)
+
+        self.map_coordinates(x_callback)
+        return highest_x, highest_y, lowest_x, lowest_y
+
     @abstractmethod
     def map_coordinates(self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         pass
@@ -58,6 +80,11 @@ class ControllerBase(ABC):
             return callback(math.sqrt(x**2 + y**2), index)
 
         self.map_coordinates(coordinate_callback)
+
+    def map_scaled_coordinates(self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]], force_positive: bool) -> None:
+        max_x, max_y, lowest_x, lowest_y = self.get_x_y_limits()
+        self.map_coordinates(lambda x, y, index: callback(
+            (x - lowest_x) / (max_x - lowest_x) if force_positive else x / max_x, (y - lowest_y) / (max_y - lowest_y) if force_positive else y / max_y, index))
 
     def map_scaled_distance(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         max_distance = self.get_max_distance()
@@ -78,6 +105,10 @@ class ControllerBase(ABC):
 
     @abstractmethod
     def show(self) -> None:
+        pass
+
+    @abstractmethod
+    def set_color(self, color: RGBW) -> None:
         pass
 
     @abstractmethod
