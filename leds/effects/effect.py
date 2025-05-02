@@ -24,7 +24,6 @@ class ColorInterpolationParameters(ABC):
             description="Color interpolation of the effect",
             enum_values=["linear", "hsv"]
         )
-        
 
 
 class SpeedWithDirectionParameters(SpeedParameters, ABC):
@@ -64,6 +63,22 @@ class Effect(ABC):
 
     def __init__(self, controller: ControllerBase):
         self.controller = controller
+
+    def get_name(self) -> str:
+        """Returns a human-readable name for the effect by converting the class name from camel case."""
+        name = self.__class__.__name__
+        # Remove 'Effect' suffix if present
+        if name.endswith('Effect'):
+            name = name[:-len('Effect')]
+
+        # Insert spaces before capital letters and capitalize only the first letter
+        result = ''
+        for i, char in enumerate(name):
+            if char.isupper() and i > 0:
+                result += ' '
+            result += char
+
+        return result
 
     @abstractmethod
     def run(self, ms: int):

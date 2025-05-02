@@ -71,6 +71,7 @@ class LEDs:
             effect_parameters = get_all_effects_parameters(self._effects)
             return jsonify({
                 'effect_parameters': effect_parameters,
+                'effect_names': {effect_name: effect.get_name() for effect_name, effect in self._effects.items()},
                 'current_effect': self._effect.__class__.__name__
             })
 

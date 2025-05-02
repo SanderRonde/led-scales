@@ -4,6 +4,13 @@ const parametersDiv = document.getElementById("parameters");
 const applyButton = document.getElementById("apply-effect");
 
 /**
+ * @typedef {Object} Effects
+ * @property {string} current_effect - The name of the current effect
+ * @property {Record<string, string>} effect_names - The names of all available effects
+ * @property {Record<string, Record<string, any>>} effect_parameters - The parameters of the current effect
+ */
+
+/**
  * Fetches available effects from the server
  * @async
  * @returns {Promise<void>}
@@ -11,11 +18,14 @@ const applyButton = document.getElementById("apply-effect");
 export async function fetchEffects() {
     try {
         const response = await fetch("/effects");
+        /** @type {Effects} */
+        const effects = await response.json();
         const {
             effect_parameters: effectParameters,
+            effect_names: effectNames,
             current_effect: currentEffect,
-        } = await response.json();
-        populateEffectSelect(effectParameters);
+        } = effects;
+        populateEffectSelect(effectParameters, effectNames);
         effectSelect.value = currentEffect;
         await onEffectChange(currentEffect);
     } catch (error) {
@@ -27,12 +37,12 @@ export async function fetchEffects() {
  * Populates the effect dropdown with available effects
  * @param {Object} effects - Object containing effect definitions
  */
-function populateEffectSelect(effects) {
+function populateEffectSelect(effectParameters, effectNames) {
     effectSelect.innerHTML = '<option value="">Select an effect...</option>';
-    Object.keys(effects).forEach((effectName) => {
+    Object.keys(effectNames).forEach((effectName) => {
         const option = document.createElement("option");
         option.value = effectName;
-        option.textContent = effectName;
+        option.textContent = effectNames[effectName];
         effectSelect.appendChild(option);
     });
 }
@@ -244,10 +254,12 @@ function hexToRgb(hex) {
 async function onEffectChange(effectName) {
     try {
         const response = await fetch("/effects");
+        /** @type {Effects} */
+        const effects = await response.json();
         const {
             effect_parameters: effectParameters,
             current_effect: currentEffect,
-        } = await response.json();
+        } = effects;
         const effect = effectParameters[effectName];
         if (effect) {
             createParameterControls(effect);
