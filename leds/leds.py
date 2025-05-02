@@ -68,7 +68,11 @@ class LEDs:
 
         @self._app.route('/effects')
         def get_effects_route():  # type: ignore  # pylint: disable=unused-variable
-            return jsonify(get_all_effects_parameters(self._effects))
+            effect_parameters = get_all_effects_parameters(self._effects)
+            return jsonify({
+                'effect_parameters': effect_parameters,
+                'current_effect': self._effect.__class__.__name__
+            })
 
         @self._app.route('/effects', methods=['POST'])
         def set_effect():  # type: ignore  # pylint: disable=unused-variable

@@ -11,8 +11,13 @@ const applyButton = document.getElementById("apply-effect");
 export async function fetchEffects() {
     try {
         const response = await fetch("/effects");
-        const effects = await response.json();
-        populateEffectSelect(effects);
+        const {
+            effect_parameters: effectParameters,
+            current_effect: currentEffect,
+        } = await response.json();
+        populateEffectSelect(effectParameters);
+        effectSelect.value = currentEffect;
+        await onEffectChange(currentEffect);
     } catch (error) {
         console.error("Failed to fetch effects:", error);
     }
@@ -233,20 +238,29 @@ function hexToRgb(hex) {
         : null;
 }
 
-// Handle effect selection
-effectSelect.addEventListener("change", async () => {
-    const effectName = effectSelect.value;
-    if (!effectName) return;
-
+/**
+ * @param {string} effectName
+ */
+async function onEffectChange(effectName) {
     try {
         const response = await fetch("/effects");
-        const effects = await response.json();
-        const effect = effects[effectName];
+        const {
+            effect_parameters: effectParameters,
+            current_effect: currentEffect,
+        } = await response.json();
+        const effect = effectParameters[effectName];
         if (effect) {
             createParameterControls(effect);
         }
     } catch (error) {
         console.error("Failed to fetch effect details:", error);
+    }
+}
+
+// Handle effect selection
+effectSelect.addEventListener("change", async () => {
+    if (effectSelect.value) {
+        await onEffectChange(effectSelect.value);
     }
 });
 
