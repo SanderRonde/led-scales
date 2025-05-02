@@ -130,8 +130,10 @@ class HexConfig(BaseConfig):
     def __init__(self):
         self.hexagons = [
             Hexagon(0, 0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+            Hexagon(0, 1, [50, 51, 52, 53, 54, 55, 56, 57, 58, 59]),
             Hexagon(1, 0.5, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
             Hexagon(1, 1.5, [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]),
+            Hexagon(2, 0, [60, 61, 62, 63, 64, 65, 66, 67, 68, 69]),
             Hexagon(2, 1, [30, 31, 32, 33, 34, 35, 36, 37, 38, 39]),
             Hexagon(2, 2, [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]),
         ]
@@ -160,7 +162,9 @@ class HexConfig(BaseConfig):
     pins: Tuple[int, int] = (13, 1)
 
 
-_config = HexConfig()
+# Change this to choose the config you want
+# _config = HexConfig()
+_config = ScaleConfig()
 
 
 def get_config() -> BaseConfig:
@@ -168,5 +172,9 @@ def get_config() -> BaseConfig:
 
 
 def get_led_controller(mock: bool) -> controllers.ControllerBase:
-    # Can use any of the controllers in the controllers package
-    return controllers.HexPanelLEDController(_config, mock)
+    if isinstance(_config, ScaleConfig):  # type: ignore
+        return controllers.ScalePanelLEDController(_config, mock)
+    elif isinstance(_config, HexConfig):  # type: ignore
+        return controllers.HexPanelLEDController(_config, mock)
+    else:
+        raise ValueError(f"Unknown config type: {type(_config)}")

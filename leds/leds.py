@@ -43,14 +43,12 @@ class LEDs:
     def _init_routes(self) -> None:
         @self._app.route('/')
         def home():  # type: ignore
-            print("Serving home page")
             return render_template('visualizer.html')
 
         @self._app.route('/static/<path:filename>')
         def static_files(filename: str):  # type: ignore
             static_dir = os.path.join(os.path.dirname(__file__), 'static')
             response = send_from_directory(static_dir, filename)
-            print(f"Serving {filename} with mimetype {response.mimetype}")
 
             # Set correct MIME types for common web files
             if filename.endswith('.js'):

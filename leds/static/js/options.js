@@ -265,11 +265,10 @@ applyButton.addEventListener("click", async () => {
             if (paramName.includes("[")) {
                 // Handle color list
                 const [baseName, indexStr] = paramName.split("[");
-                const index = parseInt(indexStr);
                 if (!parameters[baseName]) {
                     parameters[baseName] = [];
                 }
-                parameters[baseName][index] = hexToRgb(input.value);
+                parameters[baseName].push(hexToRgb(input.value));
             } else {
                 // Handle other parameters
                 if (input.type === "color") {
