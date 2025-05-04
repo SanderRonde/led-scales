@@ -1,5 +1,5 @@
 from functools import cache
-from typing import Type, Any, Tuple, Callable, Union
+from typing import Type, Any, Tuple, Callable, Union, List, Dict
 from abc import ABC, abstractmethod
 import math
 from leds.color import RGBW
@@ -104,16 +104,30 @@ class ControllerBase(ABC):
         self.map_coordinates(coordinate_callback)
 
     @abstractmethod
+    def get_strips(self) -> List[MockPixelStrip]:
+        pass
+
+    def set_brightness(self, brightness: float) -> None:
+        for strip in self.get_strips():
+            strip.setBrightness(int(brightness * 255))
+
     def show(self) -> None:
-        pass
+        for strip in self.get_strips():
+            strip.show()
 
-    @abstractmethod
     def set_color(self, color: RGBW) -> None:
-        pass
+        for strip in self.get_strips():
+            for i in range(strip.numPixels()):
+                strip.setPixelColor(i, color)
 
-    @abstractmethod
-    def json(self) -> Any:
-        pass
+    def json(self) -> List[Dict[str, int]]:
+        pixels: List[Dict[str, int]] = []
+        for strip in self.get_strips():
+            for i in range(strip.numPixels()):
+                pixel = strip.getPixelColor(i)
+                pixels.append(
+                    {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': strip.getBrightness()})
+        return pixels
 
     @abstractmethod
     def get_visualizer_config(self) -> Any:

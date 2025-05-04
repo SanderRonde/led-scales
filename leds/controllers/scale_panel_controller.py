@@ -1,4 +1,4 @@
-from typing import Type, Any, List, Tuple, Dict, Callable, Union, TYPE_CHECKING
+from typing import Type, Any, List, Tuple, Callable, Union, TYPE_CHECKING
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
 from leds.controllers.controller_base import ControllerBase
@@ -73,23 +73,8 @@ class ScalePanelLEDController(ControllerBase):
                         led_index += 1
                     y += 1
 
-    def set_color(self, color: RGBW) -> None:
-        for panel in self.panels:
-            panel.set_color(color)
-
-    def show(self):
-        for panel in self.panels:
-            panel.strip.show()
-
-    def json(self):
-        pixels: List[List[Dict[str, int]]] = []
-        for panel in self.panels:
-            strip_pixels: List[Dict[str, int]] = []
-            for pixel in panel.strip.getPixels():
-                strip_pixels.append(
-                    {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': panel.strip.getBrightness()})
-            pixels.append(strip_pixels)
-        return pixels
+    def get_strips(self) -> List[MockPixelStrip]:
+        return [panel.strip for panel in self.panels]
 
     def get_visualizer_config(self) -> Any:
         return {

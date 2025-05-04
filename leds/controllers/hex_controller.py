@@ -1,5 +1,5 @@
 import math
-from typing import Any, List, Tuple, Dict, Callable, Union, TYPE_CHECKING
+from typing import Any, List, Tuple, Callable, Union, TYPE_CHECKING
 from leds.color import RGBW
 from leds.controllers.controller_base import ControllerBase
 
@@ -78,21 +78,8 @@ class HexPanelLEDController(ControllerBase):
                 if color is not None:
                     panel.strip.setPixelColor(led_index, color)
 
-    def set_color(self, color: RGBW) -> None:
-        for panel in self.panels:
-            panel.set_color(color)
-
-    def show(self):
-        for panel in self.panels:
-            panel.strip.show()
-
-    def json(self):
-        pixels: List[Dict[str, int]] = []
-        for i in range(self.strip.numPixels()):
-            pixel = self.strip.getPixelColor(i)
-            pixels.append(
-                {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': self.strip.getBrightness()})
-        return pixels
+    def get_strips(self) -> List["MockPixelStrip"]:
+        return [panel.strip for panel in self.panels]
 
     def get_visualizer_config(self) -> Any:
         return {
