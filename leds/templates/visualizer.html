@@ -61,6 +61,10 @@
             padding: 2px;
         }
 
+        input[type="range"] {
+            padding: 0;
+        }
+
         button {
             padding: 10px;
             margin: 8px 0;
@@ -171,6 +175,13 @@
         <div class="control-panel">
             <h2>LED Control</h2>
             <button id="power-button" class="power-button">Power Off</button>
+            <div class="parameter-group">
+                <label for="brightness-slider">Brightness</label>
+                <div class="range-input">
+                    <input type="range" id="brightness-slider" min="0" max="100" value="100">
+                    <span>100%</span>
+                </div>
+            </div>
             <select id="effect-select">
                 <option value="">Select an effect...</option>
             </select>

@@ -3,6 +3,8 @@ const effectSelect = document.getElementById("effect-select");
 const parametersDiv = document.getElementById("parameters");
 const applyButton = document.getElementById("apply-effect");
 const powerButton = document.getElementById("power-button");
+const brightnessSlider = document.getElementById("brightness-slider");
+const brightnessValue = brightnessSlider.nextElementSibling;
 
 /**
  * @typedef {Object} Effects
@@ -331,6 +333,43 @@ applyButton.addEventListener("click", async () => {
         console.error("Failed to apply effect:", error);
     }
 });
+
+/**
+ * Initializes the brightness slider
+ */
+async function initializeBrightnessSlider() {
+    try {
+        const response = await fetch("/brightness");
+        const { brightness } = await response.json();
+        brightnessSlider.value = Math.round(brightness * 100);
+        brightnessValue.textContent = `${brightnessSlider.value}%`;
+    } catch (error) {
+        console.error("Failed to fetch brightness:", error);
+    }
+
+    brightnessSlider.addEventListener("input", () => {
+        brightnessValue.textContent = `${brightnessSlider.value}%`;
+    });
+
+    brightnessSlider.addEventListener("change", async () => {
+        try {
+            await fetch("/brightness", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    brightness: parseInt(brightnessSlider.value) / 100
+                }),
+            });
+        } catch (error) {
+            console.error("Failed to set brightness:", error);
+        }
+    });
+}
+
+// Initialize brightness slider when the page loads
+initializeBrightnessSlider();
 
 /**
  * Initializes the power button state and event handlers

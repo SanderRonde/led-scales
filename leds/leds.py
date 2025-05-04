@@ -40,6 +40,7 @@ class LEDs:
         # Load all configuration from a single file
         self._config_data = self._load_config()
         self._power_state = self._config_data.get('power_state', True)
+        self._brightness = self._config_data.get('brightness', 1.0)
         self._fade_start_time = 0
         self._fade_duration = 300  # ms
         self._target_power_state = self._power_state
@@ -65,7 +66,8 @@ class LEDs:
         save_path = self._get_config_path()
         config_data = {
             'power_state': self._power_state,
-            'effect_name': self._effect.__class__.__name__
+            'effect_name': self._effect.__class__.__name__,
+            'brightness': self._brightness
         }
         with open(save_path, 'w', encoding='utf-8') as f:
             json.dump(config_data, f)
@@ -169,6 +171,23 @@ class LEDs:
                 'fade_progress': min(1.0, (time.time() * 1000 - self._fade_start_time) / self._fade_duration)
             })
 
+        @self._app.route('/brightness', methods=['POST'])
+        def set_brightness():  # type: ignore  # pylint: disable=unused-variable
+            data: Dict[str, Any] = request.get_json() or {}
+            brightness: float = data.get('brightness', 1.0)
+            self._brightness = max(0.0, min(1.0, brightness))
+            self._save_config()
+            return jsonify({
+                'success': True,
+                'brightness': self._brightness
+            })
+
+        @self._app.route('/brightness')
+        def get_brightness():  # type: ignore  # pylint: disable=unused-variable
+            return jsonify({
+                'brightness': self._brightness
+            })
+
     def listen(self) -> None:
         """Start the web server in the main thread"""
         print(
@@ -206,7 +225,9 @@ class LEDs:
                         else:
                             # Fading out
                             brightness = 1.0 - fade_progress
-                        self._controller.set_brightness(brightness)
+                        self._controller.set_brightness(brightness * self._brightness)
+                    else:
+                        self._controller.set_brightness(self._brightness)
                 else:
                     self._controller.set_color(RGBW(0, 0, 0, 0))
                     self._controller.show()
