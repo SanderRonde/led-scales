@@ -36,7 +36,7 @@ class LEDs:
         self._init_routes()
         self._effects = get_effects(self._controller)
         self._running = False
-        
+
         # Load all configuration from a single file
         self._config_data = self._load_config()
         self._power_state = self._config_data.get('power_state', True)
@@ -44,7 +44,7 @@ class LEDs:
         self._fade_start_time = 0
         self._fade_duration = 300  # ms
         self._target_power_state = self._power_state
-        
+
         # Try to load saved effect, fall back to RainbowRadialEffect if none exists
         saved_effect = self._config_data.get('effect_name')
         if saved_effect and saved_effect in self._effects:
@@ -151,40 +151,34 @@ class LEDs:
         def get_visualizer_config():  # type: ignore  # pylint: disable=unused-variable
             return jsonify(self._controller.get_visualizer_config())
 
-        @self._app.route('/power', methods=['POST'])
-        def toggle_power():  # type: ignore  # pylint: disable=unused-variable
+        @self._app.route('/state', methods=['POST'])
+        def set_state():  # type: ignore  # pylint: disable=unused-variable
             data: Dict[str, Any] = request.get_json() or {}
-            target_state: bool = data.get('power_state', False)
-            self._target_power_state = target_state
-            self._fade_start_time = time.time() * 1000  # Convert to ms
-            self._save_config()  # Save the updated configuration
-            return jsonify({
-                'success': True,
-                'power_state': self._target_power_state
-            })
 
-        @self._app.route('/power')
-        def get_power_state():  # type: ignore  # pylint: disable=unused-variable
-            return jsonify({
-                'power_state': self._power_state,
-                'target_power_state': self._target_power_state,
-                'fade_progress': min(1.0, (time.time() * 1000 - self._fade_start_time) / self._fade_duration)
-            })
+            # Handle power state
+            if 'power_state' in data:
+                target_state: bool = data.get('power_state', False)
+                self._target_power_state = target_state
+                self._fade_start_time = time.time() * 1000  # Convert to ms
 
-        @self._app.route('/brightness', methods=['POST'])
-        def set_brightness():  # type: ignore  # pylint: disable=unused-variable
-            data: Dict[str, Any] = request.get_json() or {}
-            brightness: float = data.get('brightness', 1.0)
-            self._brightness = max(0.0, min(1.0, brightness))
+            # Handle brightness
+            if 'brightness' in data:
+                brightness: float = data.get('brightness', 1.0)
+                self._brightness = max(0.0, min(1.0, brightness))
+
             self._save_config()
             return jsonify({
                 'success': True,
+                'power_state': self._power_state,
+                'target_power_state': self._target_power_state,
                 'brightness': self._brightness
             })
 
-        @self._app.route('/brightness')
-        def get_brightness():  # type: ignore  # pylint: disable=unused-variable
+        @self._app.route('/state')
+        def get_state():  # type: ignore  # pylint: disable=unused-variable
             return jsonify({
+                'power_state': self._power_state,
+                'target_power_state': self._target_power_state,
                 'brightness': self._brightness
             })
 
@@ -208,13 +202,14 @@ class LEDs:
             now = time.time()
             while self._running:
                 elapsed_ms = int((time.time() - now) * 1000)
-                
+
                 # Calculate fade progress
-                fade_progress = min(1.0, (time.time() * 1000 - self._fade_start_time) / self._fade_duration)
-                
+                fade_progress = min(
+                    1.0, (time.time() * 1000 - self._fade_start_time) / self._fade_duration)
+
                 if fade_progress >= 1.0:
                     self._power_state = self._target_power_state
-                
+
                 if self._power_state or fade_progress < 1.0:
                     self._effect.run(elapsed_ms)
                     if fade_progress < 1.0:
@@ -225,13 +220,14 @@ class LEDs:
                         else:
                             # Fading out
                             brightness = 1.0 - fade_progress
-                        self._controller.set_brightness(brightness * self._brightness)
+                        self._controller.set_brightness(
+                            brightness * self._brightness)
                     else:
                         self._controller.set_brightness(self._brightness)
                 else:
                     self._controller.set_color(RGBW(0, 0, 0, 0))
                     self._controller.show()
-                
+
                 # Emit LED data through WebSocket
                 self._socketio.emit(  # type: ignore
                     'led_update', self._controller.json(), namespace='/')

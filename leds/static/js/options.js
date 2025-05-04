@@ -335,71 +335,64 @@ applyButton.addEventListener("click", async () => {
 });
 
 /**
- * Initializes the brightness slider
+ * Initializes the brightness slider and power button
  */
-async function initializeBrightnessSlider() {
+async function initializeControls() {
     try {
-        const response = await fetch("/brightness");
-        const { brightness } = await response.json();
+        const response = await fetch("/state");
+        const { brightness, power_state } = await response.json();
+
+        // Initialize brightness slider
         brightnessSlider.value = Math.round(brightness * 100);
         brightnessValue.textContent = `${brightnessSlider.value}%`;
+
+        // Initialize power button
+        updatePowerButtonState(power_state);
     } catch (error) {
-        console.error("Failed to fetch brightness:", error);
+        console.error("Failed to fetch state:", error);
     }
 
+    // Brightness slider event listeners
     brightnessSlider.addEventListener("input", () => {
         brightnessValue.textContent = `${brightnessSlider.value}%`;
     });
 
     brightnessSlider.addEventListener("change", async () => {
         try {
-            await fetch("/brightness", {
+            await fetch("/state", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    brightness: parseInt(brightnessSlider.value) / 100
+                    brightness: parseInt(brightnessSlider.value) / 100,
                 }),
             });
         } catch (error) {
             console.error("Failed to set brightness:", error);
         }
     });
-}
 
-// Initialize brightness slider when the page loads
-initializeBrightnessSlider();
-
-/**
- * Initializes the power button state and event handlers
- */
-async function initializePowerButton() {
-    try {
-        const response = await fetch("/power");
-        const { power_state } = await response.json();
-        updatePowerButtonState(power_state);
-    } catch (error) {
-        console.error("Failed to fetch power state:", error);
-    }
-
+    // Power button event listener
     powerButton.addEventListener("click", async () => {
         const currentState = !powerButton.classList.contains("off");
         try {
-            const response = await fetch("/power", {
+            await fetch("/state", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ power_state: !currentState }),
             });
-            const { power_state } = await response.json();
-            updatePowerButtonState(power_state);
+            updatePowerButtonState(!currentState);
         } catch (error) {
             console.error("Failed to toggle power:", error);
         }
     });
 }
+
+// Initialize controls when the page loads
+initializeControls();
 
 /**
  * Updates the power button state and appearance
@@ -409,6 +402,3 @@ function updatePowerButtonState(isOn) {
     powerButton.textContent = isOn ? "Power Off" : "Power On";
     powerButton.classList.toggle("off", !isOn);
 }
-
-// Initialize power button when the page loads
-initializePowerButton();
