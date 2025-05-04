@@ -8,30 +8,6 @@ import threading
 import time
 from pathlib import Path
 from typing import Union, List, TextIO
-from setuptools import setup, find_packages
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileSystemEvent
-
-# Package configuration
-PACKAGE_CONFIG = {
-    'name': 'leds',
-    'version': '0.1.0',
-    'packages': find_packages(),
-    'install_requires': [
-        'rpi_ws281x; platform_system == "Linux"',  # Only install on Linux systems
-        'flask',  # Required for mock implementation
-    ],
-    'entry_points': {
-        'console_scripts': [
-            'leds=leds.leds:main',  # Real LED implementation
-            'leds-mock=leds.leds:main_mock',  # Mock implementation
-        ],
-    },
-    'python_requires': '>=3.7',
-    'package_data': {
-        'leds.mock': ['templates/*.html'],  # Include HTML templates
-    },
-}
 
 
 def print_output(pipe: TextIO) -> None:
@@ -188,91 +164,92 @@ def print_help() -> None:
     print("  - 2D files: cad/out/panels/")
 
 
-# List of setuptools commands that should bypass our custom command handling
-SETUPTOOLS_COMMANDS = {
-    'build', 'install', 'develop', 'bdist_wheel', 'sdist', 'egg_info',
-    'easy_install', 'upload', 'register', 'check', 'test', 'build_ext',
-    'build_py', 'build_scripts', 'build_clib', 'clean', 'install_lib',
-    'install_headers', 'install_scripts', 'install_data', 'install_egg_info'
-}
-
-
-class RestartHandler(FileSystemEventHandler):
-    def __init__(self):
-        self.process = None
-        self.last_restart = 0
-        self.cooldown = 1.0  # Minimum time between restarts
-
-    def start_process(self):
-        # Kill existing process if any
-        self.stop_process()
-
-        # Start new process
-        print("\nStarting server...")
-
-        # Use python from venv
-        python_executable = os.path.join(
-            "venv", "Scripts", "python.exe") if sys.platform == "win32" else os.path.join("venv", "bin", "python")
-
-        cmd = [python_executable, '-m', 'leds.leds', '--mock']
-        self.process = subprocess.Popen( # pylint: disable=consider-using-with
-            cmd,
-            start_new_session=sys.platform != "win32"
-        )
-
-    def stop_process(self):
-        if self.process:
-            try:
-                if sys.platform == "win32":
-                    subprocess.run(
-                        ['taskkill', '/F', '/T', '/PID', str(self.process.pid)], check=False)
-                else:
-                    if hasattr(os, 'killpg'):
-                        pgid = os.getpgid(self.process.pid)
-                        os.killpg(pgid, signal.SIGTERM)
-                    else:
-                        self.process.terminate()
-            except (ProcessLookupError, subprocess.TimeoutExpired):
-                # Process already terminated or timeout waiting for it
-                pass
-            except Exception as e:
-                print(f"Warning: Failed to stop process: {e}")
-            finally:
-                self.process = None
-
-    def on_modified(self, event: FileSystemEvent) -> None:
-        if not event.is_directory and (event.src_path.endswith('.py') or event.src_path.endswith('.js')):
-            current_time = time.time()
-            if current_time - self.last_restart > self.cooldown:
-                self.last_restart = current_time
-                print("\nRestarting server due to file change...")
-                self.start_process()
-
-
 def dev() -> None:
     """Run the server in development mode with auto-reload"""
     print("Starting development server with auto-reload...")
 
-    # Set up file watching
-    event_handler = RestartHandler()
-    observer = Observer()
-
-    # Watch Python files
-    observer.schedule(event_handler, ".", recursive=True)
-    observer.start()
-
-    # Start initial process
-    event_handler.start_process()
-
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-        observer.stop()
-        event_handler.stop_process()
-        observer.join()
-        print("Server stopped")
+        # Only import watchdog when needed
+        from watchdog.observers import Observer  # pylint: disable=import-outside-toplevel
+        from watchdog.events import FileSystemEventHandler, FileSystemEvent  # pylint: disable=import-outside-toplevel
+
+        class RestartHandler(FileSystemEventHandler):
+            def __init__(self):
+                self.process = None
+                self.last_restart = 0
+                self.cooldown = 1.0  # Minimum time between restarts
+
+            def start_process(self):
+                # Kill existing process if any
+                self.stop_process()
+
+                # Start new process
+                print("\nStarting server...")
+
+                # Use python from venv
+                python_executable = os.path.join(
+                    "venv", "Scripts", "python.exe") if sys.platform == "win32" else os.path.join("venv", "bin", "python")
+
+                cmd = [python_executable, '-m', 'leds.leds', '--mock']
+                self.process = subprocess.Popen(  # pylint: disable=consider-using-with
+                    cmd,
+                    start_new_session=sys.platform != "win32"
+                )
+
+            def stop_process(self):
+                if self.process:
+                    try:
+                        if sys.platform == "win32":
+                            subprocess.run(
+                                ['taskkill', '/F', '/T', '/PID', str(self.process.pid)], check=False)
+                        else:
+                            if hasattr(os, 'killpg'):
+                                pgid = os.getpgid(self.process.pid)
+                                os.killpg(pgid, signal.SIGTERM)
+                            else:
+                                self.process.terminate()
+                    except (ProcessLookupError, subprocess.TimeoutExpired):
+                        # Process already terminated or timeout waiting for it
+                        pass
+                    except Exception as e:
+                        print(f"Warning: Failed to stop process: {e}")
+                    finally:
+                        self.process = None
+
+            def on_modified(self, event: FileSystemEvent) -> None:
+                if not event.is_directory and (str(event.src_path).endswith('.py') or str(event.src_path).endswith('.js')):
+                    current_time = time.time()
+                    if current_time - self.last_restart > self.cooldown:
+                        self.last_restart = current_time
+                        print("\nRestarting server due to file change...")
+                        self.start_process()
+
+        # Set up file watching
+        event_handler = RestartHandler()
+        observer = Observer()
+
+        # Watch Python files
+        observer.schedule(event_handler, ".", recursive=True)
+        observer.start()
+
+        # Start initial process
+        event_handler.start_process()
+
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            observer.stop()
+            event_handler.stop_process()
+            observer.join()
+            print("Server stopped")
+
+    except ImportError:
+        print("Error: watchdog package is not installed.")
+        print("Please run 'python main.py setup' first to set up the virtual environment and source it.")
+        print("This will install all required dependencies including watchdog.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -282,11 +259,7 @@ if __name__ == "__main__":
 
     command = sys.argv[1]
 
-    # If it's a setuptools command, let setuptools handle it
-    if command in SETUPTOOLS_COMMANDS:
-        setup(**PACKAGE_CONFIG)  # type: ignore
-    # Otherwise handle our custom commands
-    elif command == "setup":
+    if command == "setup":
         setup_venv()
     elif command == "generate":
         generate_cad()
@@ -319,6 +292,3 @@ if __name__ == "__main__":
         print(f"Unknown command: {command}")
         print_help()
         sys.exit(1)
-else:
-    # When imported as a module, always run setup
-    setup(**PACKAGE_CONFIG)  # type: ignore
