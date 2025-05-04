@@ -1,4 +1,13 @@
 /**
+ * @typedef {Object} LED
+ * @property {number} r - Red value
+ * @property {number} g - Green value
+ * @property {number} b - Blue value
+ * @property {number} w - White value
+ * @property {number} brightness - Brightness value [0-255]
+ */
+
+/**
  * Base class representing the LED Visualizer
  */
 export class LEDVisualizerBase {
@@ -16,7 +25,6 @@ export class LEDVisualizerBase {
         // Bind methods to this instance
         this.calculateScale = this.calculateScale.bind(this);
         this.updateCanvasSize = this.updateCanvasSize.bind(this);
-        this.drawScale = this.drawScale.bind(this);
         this.updateLEDsWithData = this.updateLEDsWithData.bind(this);
         this.resizeCanvas = this.resizeCanvas.bind(this);
 
@@ -71,7 +79,7 @@ export class LEDVisualizerBase {
     /**
      * Updates all LEDs by receiving pixel data from the WebSocket server and redrawing
      * @abstract
-     * @param {Array<Array<{r: number, g: number, b: number, w?: number}>>} pixelStrips - The pixel data received from the server
+     * @param {LED[][]} pixelStrips - The pixel data received from the server
      * @throws {Error} Should be implemented by subclasses
      */
     updateLEDsWithData(pixelStrips, scale) {
@@ -109,7 +117,9 @@ export class LEDVisualizerBase {
             this.socket.on("led_update", (data) => {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 const scale = this.calculateScale();
-                this.updateLEDsWithData(data, scale);
+                /** @type {LED[][]} */
+                const typedData = data;
+                this.updateLEDsWithData(typedData, scale);
             });
         } catch (error) {
             console.error("Failed to initialize visualizer:", error);

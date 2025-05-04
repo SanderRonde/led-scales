@@ -76,6 +76,24 @@
             background: var(--primary-dark);
         }
 
+        .power-button {
+            width: 100%;
+            margin-bottom: 16px;
+            background: #ff4444;
+        }
+
+        .power-button:hover {
+            background: #cc0000;
+        }
+
+        .power-button.off {
+            background: var(--primary);
+        }
+
+        .power-button.off:hover {
+            background: var(--primary-dark);
+        }
+
         .parameter-group {
             margin: 16px 0;
             padding: 12px;
@@ -152,6 +170,7 @@
     <div class="container">
         <div class="control-panel">
             <h2>LED Control</h2>
+            <button id="power-button" class="power-button">Power Off</button>
             <select id="effect-select">
                 <option value="">Select an effect...</option>
             </select>

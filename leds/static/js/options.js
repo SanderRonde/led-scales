@@ -2,6 +2,7 @@
 const effectSelect = document.getElementById("effect-select");
 const parametersDiv = document.getElementById("parameters");
 const applyButton = document.getElementById("apply-effect");
+const powerButton = document.getElementById("power-button");
 
 /**
  * @typedef {Object} Effects
@@ -330,3 +331,45 @@ applyButton.addEventListener("click", async () => {
         console.error("Failed to apply effect:", error);
     }
 });
+
+/**
+ * Initializes the power button state and event handlers
+ */
+async function initializePowerButton() {
+    try {
+        const response = await fetch("/power");
+        const { power_state } = await response.json();
+        updatePowerButtonState(power_state);
+    } catch (error) {
+        console.error("Failed to fetch power state:", error);
+    }
+
+    powerButton.addEventListener("click", async () => {
+        const currentState = !powerButton.classList.contains("off");
+        try {
+            const response = await fetch("/power", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ power_state: !currentState }),
+            });
+            const { power_state } = await response.json();
+            updatePowerButtonState(power_state);
+        } catch (error) {
+            console.error("Failed to toggle power:", error);
+        }
+    });
+}
+
+/**
+ * Updates the power button state and appearance
+ * @param {boolean} isOn - Whether the power is on
+ */
+function updatePowerButtonState(isOn) {
+    powerButton.textContent = isOn ? "Power Off" : "Power On";
+    powerButton.classList.toggle("off", !isOn);
+}
+
+// Initialize power button when the page loads
+initializePowerButton();

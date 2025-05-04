@@ -29,85 +29,11 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
     }
 
     /**
-     * Draws a single LED at the specified position with the given color
-     * @param {number} index - LED index
-     * @param {number} x - X coordinate
-     * @param {number} y - Y coordinate
-     * @param {{r: number, g: number, b: number, w?: number}} color - RGB color object
-     * @param {number} scale - Scale factor
-     * @param {Config} config - Configuration object
-     */
-    drawScale(index, x, y, color, scale, config) {
-        // Calculate angle towards the center
-        const centerX = config.total_width / 2;
-        const centerY = config.total_height / 2 + config.scale_length / 2;
-
-        //  // Draw the LED index as text
-        // this.ctx.save();
-        // this.ctx.font = `${10 * scale}px Arial`;
-        // this.ctx.fillStyle = "#FFFFFF";
-        // this.ctx.textAlign = "center";
-        // this.ctx.textBaseline = "middle";
-        // this.ctx.fillText(index.toString(), x * scale, y * scale);
-        // this.ctx.restore();
-
-        // Calculate the angle from the LED position to the center
-        const dx = centerX - x;
-        const dy = centerY - y;
-        const angle = Math.atan2(dy, dx);
-
-        // Subtract 45 degrees (π/4 radians)
-        const adjustedAngle = angle - Math.PI / 4;
-
-        // Draw scale itself
-        this.ctx.save();
-        const offset =
-            Math.sqrt((config.scale_length * config.scale_length) / 2) /
-            Math.sqrt(2);
-        // First translate to the LED center point
-        this.ctx.translate(x * scale, y * scale);
-        // Then rotate around this center point
-        this.ctx.rotate(adjustedAngle);
-        // Then translate by the offset to position the scale correctly
-        this.ctx.translate(-offset, -offset);
-
-        // Draw horizontal part of the scale
-        this.ctx.beginPath();
-        this.ctx.rect(
-            0,
-            0,
-            config.scale_length * scale,
-            config.scale_width * scale
-        );
-        this.ctx.fillStyle = `#FFFFFF`;
-        this.ctx.fill();
-
-        // Draw vertical part of the scale
-        this.ctx.beginPath();
-        this.ctx.rect(
-            0,
-            0,
-            config.scale_width * scale,
-            config.scale_length * scale
-        );
-        this.ctx.fillStyle = `#FFFFFF`;
-        this.ctx.fill();
-
-        this.ctx.restore();
-
-        // Draw LED
-        this.ctx.beginPath();
-        this.ctx.arc(x * scale, y * scale, 5 * scale, 0, Math.PI * 2);
-        this.ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-        this.ctx.fill();
-    }
-
-    /**
      * Draws a simple hexagon at the specified position
      * @param {number} x - X coordinate of center
      * @param {number} y - Y coordinate of center
      * @param {number} hexIndex - Index of the hexagon
-     * @param {Array<Array<{r: number, g: number, b: number, w?: number}>>} pixelStrips - The pixel data received from the server
+     * @param {import("./visualizer-base.js").LED[][]} pixelStrips - The pixel data received from the server
      * @param {number} scale - Scale factor
      */
     drawHexagon(x, y, hexIndex, pixelStrips, scale) {
@@ -156,8 +82,13 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
                 Math.PI * 2
             );
             const ledIndex = this.config.hexagons[hexIndex].ordered_leds[i];
-
-            this.ctx.fillStyle = `rgb(${pixelStrips[ledIndex].r}, ${pixelStrips[ledIndex].g}, ${pixelStrips[ledIndex].b})`;
+            // Apply brightness to RGB values
+            const brightness = pixelStrips[ledIndex].brightness / 255; // Default to 1.0 if not provided
+            this.ctx.fillStyle = `rgb(${
+                pixelStrips[ledIndex].r * brightness
+            }, ${pixelStrips[ledIndex].g * brightness}, ${
+                pixelStrips[ledIndex].b * brightness
+            })`;
             this.ctx.fill();
         }
         this.ctx.restore();
@@ -165,7 +96,7 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
 
     /**
      * Updates all LEDs by receiving pixel data from the WebSocket server and redrawing
-     * @param {Array<Array<{r: number, g: number, b: number, w?: number}>>} pixelStrips - The pixel data received from the server
+     * @param {import("./visualizer-base.js").LED[][]} pixelStrips - The pixel data received from the server
      * @param {number} scale - Scale factor
      */
     updateLEDsWithData(pixelStrips, scale) {

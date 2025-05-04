@@ -91,7 +91,7 @@ class HexPanelLEDController(ControllerBase):
         for i in range(self.strip.numPixels()):
             pixel = self.strip.getPixelColor(i)
             pixels.append(
-                {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w})
+                {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': self.strip.getBrightness()})
         return pixels
 
     def get_visualizer_config(self) -> Any:

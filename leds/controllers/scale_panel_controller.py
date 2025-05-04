@@ -87,7 +87,7 @@ class ScalePanelLEDController(ControllerBase):
             strip_pixels: List[Dict[str, int]] = []
             for pixel in panel.strip.getPixels():
                 strip_pixels.append(
-                    {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w})
+                    {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': panel.strip.getBrightness()})
             pixels.append(strip_pixels)
         return pixels
 

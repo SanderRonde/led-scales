@@ -12,6 +12,7 @@ from flask_socketio import SocketIO  # pylint: disable=import-error
 from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
 from leds.effects.rainbow_radial import RainbowRadialEffect
+from leds.controllers.controller_base import RGBW
 from config import get_led_controller, BaseConfig, get_config
 # Add parent directory to Python path when running directly
 if __name__ == '__main__':
@@ -36,8 +37,12 @@ class LEDs:
         self._effects = get_effects(self._controller)
         self._running = False
 
+        # Load all configuration from a single file
+        self._config_data = self._load_config()
+        self._power_state = self._config_data.get('power_state', True)
+
         # Try to load saved effect, fall back to RainbowRadialEffect if none exists
-        saved_effect = self._load_saved_effect()
+        saved_effect = self._config_data.get('effect_name')
         if saved_effect and saved_effect in self._effects:
             self._effect = self.set_effect(saved_effect)
         else:
@@ -47,6 +52,31 @@ class LEDs:
         if self._controller.is_mock:
             return SLEEP_TIME_MOCK
         return SLEEP_TIME_REAL
+
+    def _get_config_path(self) -> Path:
+        """Get the path where the configuration is saved"""
+        return Path.home() / ".led_config.json"
+
+    def _save_config(self) -> None:
+        """Save the current configuration to disk"""
+        save_path = self._get_config_path()
+        config_data = {
+            'power_state': self._power_state,
+            'effect_name': self._effect.__class__.__name__
+        }
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f)
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load the configuration from disk"""
+        save_path = self._get_config_path()
+        if not save_path.exists():
+            return {'power_state': True}  # Default configuration
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, KeyError):
+            return {'power_state': True}
 
     def _init_routes(self) -> None:
         @self._app.route('/')
@@ -107,7 +137,7 @@ class LEDs:
                                 param_name).set_value(param_value)
 
             self._running = True
-            self._save_current_effect()  # Save the effect when it's changed
+            self._save_config()  # Save the updated configuration
             return jsonify({
                 'success': True
             })
@@ -116,6 +146,23 @@ class LEDs:
         def get_visualizer_config():  # type: ignore  # pylint: disable=unused-variable
             return jsonify(self._controller.get_visualizer_config())
 
+        @self._app.route('/power', methods=['POST'])
+        def toggle_power():  # type: ignore  # pylint: disable=unused-variable
+            data: Dict[str, Any] = request.get_json() or {}
+            power_state: bool = data.get('power_state', False)
+            self._power_state = power_state
+            self._save_config()  # Save the updated configuration
+            return jsonify({
+                'success': True,
+                'power_state': self._power_state
+            })
+
+        @self._app.route('/power')
+        def get_power_state():  # type: ignore  # pylint: disable=unused-variable
+            return jsonify({
+                'power_state': self._power_state
+            })
+
     def listen(self) -> None:
         """Start the web server in the main thread"""
         print(
@@ -123,33 +170,11 @@ class LEDs:
         self._socketio.run(self._app, port=self.config.web_port,  # type: ignore
                            debug=False, use_reloader=False)
 
-    def _get_effect_save_path(self) -> Path:
-        """Get the path where the current effect is saved"""
-        return Path.home() / ".led_effect.json"
-
-    def _save_current_effect(self) -> None:
-        """Save the current effect name to disk"""
-        save_path = self._get_effect_save_path()
-        with open(save_path, 'w', encoding='utf-8') as f:
-            json.dump({'effect_name': self._effect.__class__.__name__}, f)
-
-    def _load_saved_effect(self) -> Union[str, None]:
-        """Load the saved effect name from disk"""
-        save_path = self._get_effect_save_path()
-        if not save_path.exists():
-            return None
-        try:
-            with open(save_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get('effect_name')
-        except (json.JSONDecodeError, KeyError):
-            return None
-
     def set_effect(self, effect_name: str) -> Effect:
         """Set the effect to run"""
         self._effect = self._effects[effect_name]
         self._running = True
-        self._save_current_effect()  # Save the effect when it's changed
+        self._save_config()  # Save the updated configuration
         return self._effect
 
     def start(self) -> None:
@@ -157,8 +182,12 @@ class LEDs:
         def run_effect() -> None:
             now = time.time()
             while self._running:
-                elapsed_ms = int((time.time() - now) * 1000)
-                self._effect.run(elapsed_ms)
+                if self._power_state:
+                    elapsed_ms = int((time.time() - now) * 1000)
+                    self._effect.run(elapsed_ms)
+                else:
+                    self._controller.set_color(RGBW(0, 0, 0, 0))
+                    self._controller.show()
                 # Emit LED data through WebSocket
                 self._socketio.emit(  # type: ignore
                     'led_update', self._controller.json(), namespace='/')

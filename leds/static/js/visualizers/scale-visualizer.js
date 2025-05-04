@@ -32,7 +32,7 @@ export class ScaleLEDVisualizer extends LEDVisualizerBase {
      * @param {number} index - LED index
      * @param {number} x - X coordinate
      * @param {number} y - Y coordinate
-     * @param {{r: number, g: number, b: number, w?: number}} color - RGB color object
+     * @param {import("./visualizer-base.js").LED} color - RGB color object
      * @param {number} scale - Scale factor
      * @param {Config} config - Configuration object
      */
@@ -97,13 +97,17 @@ export class ScaleLEDVisualizer extends LEDVisualizerBase {
         // Draw LED
         this.ctx.beginPath();
         this.ctx.arc(x * scale, y * scale, 5 * scale, 0, Math.PI * 2);
-        this.ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+        // Apply brightness to RGB values
+        const brightness = color.brightness / 255; // Default to 1.0 if not provided
+        this.ctx.fillStyle = `rgb(${color.r * brightness}, ${
+            color.g * brightness
+        }, ${color.b * brightness})`;
         this.ctx.fill();
     }
 
     /**
      * Updates all LEDs by receiving pixel data from the WebSocket server and redrawing
-     * @param {Array<Array<{r: number, g: number, b: number, w?: number}>>} pixelStrips - The pixel data received from the server
+     * @param {import("./visualizer-base.js").LED[][]} pixelStrips - The pixel data received from the server
      * @param {number} scale - Scale factor
      */
     updateLEDsWithData(pixelStrips, scale) {
