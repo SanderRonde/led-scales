@@ -73,7 +73,7 @@ class ScalePanelLEDController(ControllerBase):
                         led_index += 1
                     y += 1
 
-    def get_strips(self) -> List[MockPixelStrip]:
+    def get_strips(self) -> List["MockPixelStrip"]:
         return [panel.strip for panel in self.panels]
 
     def get_visualizer_config(self) -> Any:

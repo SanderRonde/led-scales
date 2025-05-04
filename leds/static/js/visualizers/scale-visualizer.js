@@ -122,38 +122,34 @@ export class ScaleLEDVisualizer extends LEDVisualizerBase {
             for (let x = 0; x < this.config.x_count; x++) {
                 // Draw row from bottom to top
                 for (let y = 0; y < this.config.y_count; y++) {
-                    if (pixelIndex < pixelStrips[panel].length) {
-                        this.drawScale(
-                            pixelIndex,
-                            panelOffsetX + x * this.config.spacing,
-                            this.config.total_height -
-                                (y + 1) * this.config.spacing,
-                            pixelStrips[panel][pixelIndex],
-                            scale,
-                            this.config
-                        );
-                        pixelIndex++;
-                    }
+                    this.drawScale(
+                        pixelIndex,
+                        panelOffsetX + x * this.config.spacing,
+                        this.config.total_height -
+                            (y + 1) * this.config.spacing,
+                        pixelStrips[panel][pixelIndex],
+                        scale,
+                        this.config
+                    );
+                    pixelIndex++;
                 }
 
                 // Then draw row from top to bottom
                 if (x !== this.config.x_count - 1) {
                     for (let y = this.config.y_count - 1; y >= 0; y--) {
-                        if (pixelIndex < pixelStrips[panel].length) {
-                            this.drawScale(
-                                pixelIndex,
-                                panelOffsetX +
-                                    x * this.config.spacing +
-                                    this.config.spacing / 2,
-                                this.config.total_height -
-                                    y * this.config.spacing -
-                                    this.config.spacing / 2,
-                                pixelStrips[panel][pixelIndex],
-                                scale,
-                                this.config
-                            );
-                            pixelIndex++;
-                        }
+                        this.drawScale(
+                            pixelIndex,
+                            panelOffsetX +
+                                x * this.config.spacing +
+                                this.config.spacing / 2,
+                            this.config.total_height -
+                                y * this.config.spacing -
+                                this.config.spacing / 2,
+                            pixelStrips[panel][pixelIndex],
+                            scale,
+                            this.config
+                        );
+                        pixelIndex++;
                     }
                 }
             }

@@ -83,11 +83,11 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
             );
             const ledIndex = this.config.hexagons[hexIndex].ordered_leds[i];
             // Apply brightness to RGB values
-            const brightness = pixelStrips[ledIndex].brightness / 255; // Default to 1.0 if not provided
+            const brightness = pixelStrips[0][ledIndex].brightness / 255; // Default to 1.0 if not provided
             this.ctx.fillStyle = `rgb(${
-                pixelStrips[ledIndex].r * brightness
-            }, ${pixelStrips[ledIndex].g * brightness}, ${
-                pixelStrips[ledIndex].b * brightness
+                pixelStrips[0][ledIndex].r * brightness
+            }, ${pixelStrips[0][ledIndex].g * brightness}, ${
+                pixelStrips[0][ledIndex].b * brightness
             })`;
             this.ctx.fill();
         }

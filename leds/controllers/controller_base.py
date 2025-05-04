@@ -120,13 +120,15 @@ class ControllerBase(ABC):
             for i in range(strip.numPixels()):
                 strip.setPixelColor(i, color)
 
-    def json(self) -> List[Dict[str, int]]:
-        pixels: List[Dict[str, int]] = []
+    def json(self) -> List[List[Dict[str, int]]]:
+        pixels: List[List[Dict[str, int]]] = []
         for strip in self.get_strips():
+            strip_pixels: List[Dict[str, int]] = []
             for i in range(strip.numPixels()):
                 pixel = strip.getPixelColor(i)
-                pixels.append(
+                strip_pixels.append(
                     {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': strip.getBrightness()})
+            pixels.append(strip_pixels)
         return pixels
 
     @abstractmethod
