@@ -108,6 +108,65 @@ class LEDs:
 
             return response
 
+        @self._app.route('/presets', methods=['GET'])
+        def get_presets():  # type: ignore  # pylint: disable=unused-variable
+            presets = self._config_data.get('presets', [])
+            return jsonify(presets)
+
+        @self._app.route('/presets', methods=['POST'])
+        def save_preset():  # type: ignore  # pylint: disable=unused-variable
+            data = request.get_json()
+            if not data or 'name' not in data:
+                return jsonify({'error': 'Invalid preset data'}), 400
+
+            presets = self._config_data.get('presets', [])
+            preset = {
+                'id': data.get('id', int(time.time() * 1000)),
+                'name': data['name'],
+                'effect': data['effect'],
+                'brightness': data['brightness'],
+                'parameters': data['parameters']
+            }
+
+            # Update existing preset or add new one
+            existing_index = next((i for i, p in enumerate(presets) if p['id'] == preset['id']), -1)
+            if existing_index >= 0:
+                presets[existing_index] = preset
+            else:
+                presets.append(preset)
+
+            self._config_data['presets'] = presets
+            self._save_config()
+            return jsonify(preset)
+
+        @self._app.route('/presets/<int:preset_id>', methods=['DELETE'])
+        def delete_preset(preset_id: int):  # type: ignore  # pylint: disable=unused-variable
+            presets = self._config_data.get('presets', [])
+            self._config_data['presets'] = [p for p in presets if p['id'] != preset_id]
+            self._save_config()
+            return jsonify({'success': True})
+
+        @self._app.route('/presets/apply', methods=['POST'])
+        def apply_preset():  # type: ignore  # pylint: disable=unused-variable
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No preset data provided'}), 400
+
+            # Set effect and parameters
+            self._effect = self._effects[data['effect']]
+            if 'parameters' in data:
+                for param_name, param_value in data['parameters'].items():
+                    if hasattr(self._effect.PARAMETERS, param_name):
+                        getattr(self._effect.PARAMETERS, param_name).set_value(param_value)
+
+            # Set brightness
+            if 'brightness' in data:
+                self._brightness = data['brightness']
+
+            self._running = True
+            self._save_config()
+            return jsonify({'success': True})
+
         @self._app.route('/effects')
         def get_effects_route():  # type: ignore  # pylint: disable=unused-variable
             effect_parameters = get_all_effects_parameters(self._effects)

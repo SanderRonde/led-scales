@@ -281,6 +281,10 @@ effectSelect.addEventListener("change", async () => {
 
 // Apply selected effect
 applyButton.addEventListener("click", async () => {
+    await applyEffect();
+});
+
+export async function applyEffect() {
     const effectName = effectSelect.value;
     if (!effectName) return;
 
@@ -332,7 +336,7 @@ applyButton.addEventListener("click", async () => {
     } catch (error) {
         console.error("Failed to apply effect:", error);
     }
-});
+}
 
 /**
  * Initializes the brightness slider and power button
@@ -342,9 +346,7 @@ async function initializeControls() {
         const response = await fetch("/state");
         const { brightness, power_state } = await response.json();
 
-        // Initialize brightness slider
-        brightnessSlider.value = Math.round(brightness * 100);
-        brightnessValue.textContent = `${brightnessSlider.value}%`;
+        updateBrightnessSliderState(brightness);
 
         // Initialize power button
         updatePowerButtonState(power_state);
@@ -389,6 +391,12 @@ async function initializeControls() {
             console.error("Failed to toggle power:", error);
         }
     });
+}
+
+export function updateBrightnessSliderState(brightness) {
+    // Initialize brightness slider
+    brightnessSlider.value = Math.round(brightness * 100);
+    brightnessValue.textContent = `${brightnessSlider.value}%`;
 }
 
 // Initialize controls when the page loads
