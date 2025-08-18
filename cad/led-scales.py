@@ -10,6 +10,7 @@ import math
 import subprocess
 import sys
 import os
+import shutil
 from enum import Enum
 from typing import Dict, Tuple, List
 import openpyscad as ops
@@ -306,15 +307,17 @@ diffuser_dir = os.path.join(out_dir, "diffuser")
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
     print(f"Created directory: {out_dir}", flush=True)
-if not os.path.exists(tiles_dir):
-    os.makedirs(tiles_dir)
-    print(f"Created directory: {tiles_dir}", flush=True)
-if not os.path.exists(panels_dir):
-    os.makedirs(panels_dir)
-    print(f"Created directory: {panels_dir}", flush=True)
-if not os.path.exists(diffuser_dir):
-    os.makedirs(diffuser_dir)
-    print(f"Created directory: {diffuser_dir}", flush=True)
+for directory in [tiles_dir, panels_dir, diffuser_dir]:
+    if os.path.exists(directory):
+        for file in os.listdir(directory):
+            file_path = os.path.join(directory, file)
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+    else:
+        os.makedirs(directory)
+        print(f"Created directory: {directory}", flush=True)
 
 ((draw_scale(Mode.THREE_D, 0) - ops.Cube([100, 100, 100]).translate(
     [-50, -50, -100])) + ops.Cylinder(d=config.led_template_diameter, h=1)).write(os.path.join(out_dir, "led-scales-py.single.scad"))
