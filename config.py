@@ -48,16 +48,16 @@ class ScaleConfig(BaseConfig):
     price_per_kilo: float = 20  # Price in {currency} per kilogram of filament
 
     # 3D Printing
-    x_print_bed: float = 200
-    y_print_bed: float = 200
+    x_print_bed: float = 256
+    y_print_bed: float = 256
     x_print_spacing: float = 15
     y_print_additional_spacing: float = 6
-    print_outside_padding: float = 20
+    print_outside_padding: float = 5
     # You'll want to change this
     scad_path: Union[str,
                      Path] = "B:/programs/Program Files/OpenSCAD/openscad.exe"
     x_per_build_plate_override: Optional[int] = None
-    y_per_build_plate_override: Optional[int] = 1
+    y_per_build_plate_override: Optional[int] = None
     # This is purely visual and doesn't affect the result
     print_bed_spacing: float = 400
 
@@ -83,6 +83,14 @@ class ScaleConfig(BaseConfig):
     @property
     def panel_height(self) -> float:
         return (self.y_count + 0.5) * self.spacing
+    
+    @property
+    def print_bed_x(self) -> float:
+        return self.x_print_bed - (self.print_outside_padding * 2)
+    
+    @property
+    def print_bed_y(self) -> float:
+        return self.y_print_bed - (self.print_outside_padding * 2)
 
     @property
     def total_width(self) -> float:

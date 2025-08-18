@@ -128,9 +128,9 @@ def get_optimal_tile_x(distance_values: List[float], y_per_build_plate: int, tot
         max_lean = max(max_lean, lean_angle(d))
 
     x_lower_bound = math.floor(
-        (config.x_print_bed - x_offset_for_lean(total_max_lean)) / config.x_print_spacing)
+        (config.print_bed_x - x_offset_for_lean(total_max_lean)) / config.x_print_spacing)
     x_upper_bound = math.floor(
-        (config.x_print_bed) / config.x_print_spacing)
+        (config.print_bed_x) / config.x_print_spacing)
 
     for x in range(x_upper_bound, x_lower_bound, -1):
         included_distance_values = distance_values[:x * y_per_build_plate]
@@ -139,7 +139,7 @@ def get_optimal_tile_x(distance_values: List[float], y_per_build_plate: int, tot
             max_lean_for_included = max(max_lean_for_included, lean_angle(d))
 
         x_per_build_plate = math.floor(
-            (config.x_print_bed - x_offset_for_lean(max_lean_for_included)) /
+            (config.print_bed_x - x_offset_for_lean(max_lean_for_included)) /
             config.x_print_spacing
         )
         if x == x_per_build_plate:
@@ -157,7 +157,7 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
         ((config.base_length - (config.base_width / 2)) * (config.base_length - (config.base_width / 2))) / 2)
     y_print_spacing = (scale_small_side_length * 2) + 6
     y_per_build_plate = math.floor(
-        (config.y_print_bed) / y_print_spacing)
+        (config.print_bed_y) / y_print_spacing)
     if config.y_per_build_plate_override is not None:
         y_per_build_plate = config.y_per_build_plate_override
 
@@ -180,7 +180,7 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
             x_per_build_plate = config.x_per_build_plate_override
 
         if preview and mode != Mode.POSITIONING:
-            result.append(ops.Cube([config.x_print_bed, config.y_print_bed, 1]).translate(
+            result.append(ops.Cube([config.print_bed_x, config.print_bed_y, 1]).translate(
                 [tile_offset, 0, 0]).translate([
                     -scale_small_side_length,
                     -scale_small_side_length,
@@ -236,7 +236,7 @@ def to_stls(file_name: str):
         (tile - negative).write(tile_out_path)
         if "--3d" in sys.argv:
             print(
-                f"Converting SCAD file to STL for tile {i}/{len(tiles)} ({(i+1)/len(tiles)*100:.1f}%)...", flush=True)
+                f"Converting SCAD file to STL for tile {i + 1}/{len(tiles)} ({(i+1)/len(tiles)*100:.1f}%)...", flush=True)
             subprocess.run([config.scad_path, "-o", f"{file_name}-{i}.stl", tile_out_path],
                            stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL,
