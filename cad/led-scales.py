@@ -190,9 +190,6 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
 
         for x in range(x_per_build_plate):
             for y in range(y_per_build_plate):
-                if total_count >= len(distance_items):
-                    return (result, tiles)
-
                 key, d = distance_items[total_count]
                 translate_x = max_x_offset + \
                     tile_offset + (x * config.x_print_spacing)
@@ -207,6 +204,8 @@ def printable(coordinate_map: Dict[Tuple[float, float], float], mode: Mode, prev
                     result.append(text)
 
                 total_count += 1
+                if total_count >= len(distance_items):
+                    return (result, tiles)
         tile_count += 1
 
 
