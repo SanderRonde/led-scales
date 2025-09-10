@@ -1,5 +1,7 @@
 cad/out
 venv/
+venv-cad/
+venv-led/
 __pycache__/
 
 led_scales.egg-info

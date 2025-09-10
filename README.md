@@ -2,11 +2,37 @@
 
 A Python-based tool for generating LED scale patterns.
 
+## Project Structure
+
+The project is split into two main components, each with its own virtual environment:
+1. CAD Generation (`venv-cad`) - For creating 3D printable scales and panel layouts
+2. LED Control (`venv-led`) - For controlling the LED patterns through a web interface
+
+## Virtual Environments
+
+The project uses separate virtual environments for each component to keep dependencies clean and isolated:
+
+- `venv-cad` - Contains dependencies for CAD generation (numpy, openpyscad, scipy)
+- `venv-led` - Contains dependencies for LED control (Flask, WebSocket, etc.)
+
+Virtual environments are created and managed automatically when you run the respective commands.
+
 ## How to generate files
 
 1. Open `config.py` and set the parameters to your liking. Be sure to update `scad_path` to the path of your OpenSCAD installation.
-2. Set up virtual environment: `python main.py setup`
+2. Set up both virtual environments: `python main.py setup`
 3. Run `python main.py all` to generate all the necessary files
+   - This will automatically use the CAD virtual environment
+
+## Development
+
+- For LED development: `python main.py dev` 
+  - Starts a development server with auto-reload
+  - Uses the LED virtual environment
+- For CAD development: `python main.py generate` (or `2d`/`3d`)
+  - Uses the CAD virtual environment
+- For linting: `python main.py lint`
+  - Uses the CAD virtual environment (contains pylint)
 
 ## How to use
 

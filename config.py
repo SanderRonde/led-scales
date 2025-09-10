@@ -50,9 +50,9 @@ class ScaleConfig(BaseConfig):
     # 3D Printing
     x_print_bed: float = 256
     y_print_bed: float = 256
-    x_print_spacing: float = 15
-    y_print_additional_spacing: float = 6
-    print_outside_padding: float = 5
+    x_print_spacing: float = 25
+    y_print_additional_spacing: float = 10
+    print_outside_padding: float = 10
     # You'll want to change this
     scad_path: Union[str,
                      Path] = "B:/programs/Program Files/OpenSCAD/openscad.exe"

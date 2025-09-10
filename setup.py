@@ -9,8 +9,6 @@ PACKAGE_CONFIG: Dict[str, Any] = {
     'packages': find_packages(),
     'install_requires': [
         'rpi_ws281x; platform_system == "Linux"',  # Only install on Linux systems
-        'flask',  # Required for mock implementation
-        'watchdog',  # Required for development mode
     ],
     'entry_points': {
         'console_scripts': [
@@ -22,6 +20,19 @@ PACKAGE_CONFIG: Dict[str, Any] = {
     'package_data': {
         'leds.mock': ['templates/*.html', 'static/**/*'],  # Include HTML templates and static files
     },
+    'extras_require': {
+        'led': [
+            'flask',  # Required for mock implementation
+            'watchdog',  # Required for development mode
+            'Flask-SocketIO',  # Required for real-time updates
+            'python-socketio',  # Required for real-time updates
+        ],
+        'cad': [
+            'numpy',  # Required for CAD generation
+            'openpyscad',  # Required for CAD generation
+            'scipy',  # Required for CAD generation
+        ],
+    }
 }
 
 # When imported as a module, run setup

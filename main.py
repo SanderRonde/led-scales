@@ -7,7 +7,7 @@ import signal
 import threading
 import time
 from pathlib import Path
-from typing import Union, List, TextIO
+from typing import Union, List, TextIO, Literal
 
 
 def print_output(pipe: TextIO) -> None:
@@ -71,32 +71,55 @@ def run_command(cmd: Union[str, List[str]], shell: bool = True) -> None:
         sys.exit(1)
 
 
-def setup_venv() -> None:
-    print("Setting up virtual environment...")
-    venv_path = Path("venv")
+def get_venv_path(venv_type: Literal['cad', 'led']) -> Path:
+    """Get the path for a specific virtual environment"""
+    return Path(f"venv-{venv_type}")
+
+
+def get_venv_python(venv_type: Literal['cad', 'led']) -> str:
+    """Get the Python executable path for a specific virtual environment"""
+    venv_path = get_venv_path(venv_type)
+    if sys.platform == "win32":
+        return str(venv_path / "Scripts" / "python.exe")
+    return str(venv_path / "bin" / "python")
+
+
+def get_venv_activate(venv_type: Literal['cad', 'led']) -> Path:
+    """Get the activation script path for a specific virtual environment"""
+    venv_path = get_venv_path(venv_type)
+    if sys.platform == "win32":
+        return venv_path / "Scripts" / "activate.bat"
+    return venv_path / "bin" / "activate"
+
+
+def setup_venv(venv_type: Literal['cad', 'led']) -> None:
+    """Set up a specific virtual environment"""
+    print(f"Setting up {venv_type} virtual environment...")
+    venv_path = get_venv_path(venv_type)
 
     if not venv_path.exists():
         venv.create(venv_path, with_pip=True)
 
-    # Activate virtual environment and install requirements
+    # Install base package in editable mode with appropriate extras
+    activate_script = get_venv_activate(venv_type)
     if sys.platform == "win32":
-        activate_script = venv_path / "Scripts" / "activate.bat"
-        pip_command = f'"{activate_script}" && pip install -r requirements.txt && pip install -e .'
+        pip_command = f'"{activate_script}" && pip install -e ".[{venv_type}]"'
     else:
-        activate_script = venv_path / "bin" / "activate"
-        pip_command = f'. "{activate_script}" && pip install -r requirements.txt && pip install -e .'
+        pip_command = f'. "{activate_script}" && pip install -e ".[{venv_type}]"'
 
     run_command(pip_command)
-    print("Setup complete!")
+    print(f"{venv_type.upper()} environment setup complete!")
 
 
 def generate_cad(mode: str = "") -> None:
+    print("Setting up CAD environment...")
+    setup_venv('cad')
+
     print("Generating CAD files...")
+    activate_script = get_venv_activate('cad')
     if sys.platform == "win32":
-        activate_script = "venv\\Scripts\\activate.bat"
         cmd = f'"{activate_script}" && python cad/led-scales.py {mode}'
     else:
-        activate_script = "venv/bin/activate"
         cmd = f'. "{activate_script}" && python cad/led-scales.py {mode}'
 
     run_command(cmd)
@@ -104,12 +127,14 @@ def generate_cad(mode: str = "") -> None:
 
 
 def run_leds(mock: bool = False) -> None:
+    print("Setting up LED environment...")
+    setup_venv('led')
+
     print("Running LED implementation...")
+    activate_script = get_venv_activate('led')
     if sys.platform == "win32":
-        activate_script = "venv\\Scripts\\activate.bat"
         cmd = f'"{activate_script}" && leds {"--mock" if mock else ""}'
     else:
-        activate_script = "venv/bin/activate"
         cmd = f'. "{activate_script}" && leds {"--mock" if mock else ""}'
     run_command(cmd)
 
@@ -119,7 +144,8 @@ def clean() -> None:
     paths_to_clean = [
         "__pycache__",
         "cad/__pycache__",
-        "venv",
+        "venv-cad",
+        "venv-led",
         "cad/out"
     ]
 
@@ -138,21 +164,22 @@ def clean() -> None:
 
 def lint() -> None:
     """Run pylint on the codebase"""
+    print("Setting up CAD environment for linting...")
+    setup_venv('cad')  # CAD environment has pylint
+
     print("Running pylint...")
-    if sys.platform == "win32":
-        cmd = 'venv\\Scripts\\Python.exe -m pylint --rcfile=.pylintrc leds/ cad/ main.py config.py'
-    else:
-        cmd = 'venv/bin/python -m pylint --rcfile=.pylintrc leds/ cad/ main.py config.py'
+    python_exe = get_venv_python('cad')
+    cmd = f'"{python_exe}" -m pylint --rcfile=.pylintrc leds/ cad/ main.py config.py'
     run_command(cmd)
 
 
 def print_help() -> None:
     print("LED Scales CAD Generator:")
-    print("  python main.py setup    - Set up the development environment")
+    print("  python main.py setup    - Set up both development environments")
     print("  python main.py generate - Generate CAD files (default mode)")
     print("  python main.py 3d       - Generate 3D printable STL files for the scales")
     print("  python main.py 2d       - Generate 2D SVG files for laser cutting/CNC")
-    print("  python main.py clean    - Clean up generated files and environment")
+    print("  python main.py clean    - Clean up generated files and environments")
     print("  python main.py all      - Generate all needed files")
     print("  python main.py help     - Show this help message")
     print("  python main.py leds     - Run the LED implementation")
@@ -166,6 +193,9 @@ def print_help() -> None:
 
 def dev() -> None:
     """Run the server in development mode with auto-reload"""
+    print("Setting up LED environment...")
+    setup_venv('led')
+
     print("Starting development server with auto-reload...")
 
     try:
@@ -187,8 +217,7 @@ def dev() -> None:
                 print("\nStarting server...")
 
                 # Use python from venv
-                python_executable = os.path.join(
-                    "venv", "Scripts", "python.exe") if sys.platform == "win32" else os.path.join("venv", "bin", "python")
+                python_executable = get_venv_python('led')
 
                 cmd = [python_executable, '-m', 'leds.leds', '--mock']
                 self.process = subprocess.Popen(  # pylint: disable=consider-using-with
@@ -260,7 +289,8 @@ if __name__ == "__main__":
     command = sys.argv[1]
 
     if command == "setup":
-        setup_venv()
+        setup_venv('cad')
+        setup_venv('led')
     elif command == "generate":
         generate_cad()
     elif command == "2d":
