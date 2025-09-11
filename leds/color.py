@@ -1,15 +1,34 @@
 """RGBW color model implementation"""
-from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 
-@dataclass
-class RGBW:
+class RGBW(int):
     """Represents a color in RGBW format"""
-    r: int
-    g: int
-    b: int
-    w: int
+    def __new__(cls, r: int, g: Optional[int]=None, b: Optional[int]=None, w: Optional[int]=None):
+        if (g, b, w) == (None, None, None):
+            return int.__new__(cls, r)
+        else:
+            if w is None:
+                w = 0
+            if g is None or b is None:
+                raise ValueError("Either only the first arg or all three must be provided")
+            return int.__new__(cls, (w << 24) | (r << 16) | (g << 8) | b)
+
+    @property
+    def r(self):
+        return (self >> 16) & 0xff
+
+    @property
+    def g(self):
+        return (self >> 8) & 0xff
+
+    @property
+    def b(self):
+        return (self) & 0xff
+
+    @property
+    def w(self):
+        return (self >> 24) & 0xff
 
     @property
     def hsv(self) -> Tuple[float, float, float]:
@@ -93,10 +112,10 @@ class RGBW:
     def from_dict(cls, data: Dict[str, int]) -> 'RGBW':
         """Create RGBW from dictionary format"""
         return cls(
-            r=data.get('r', 0),
-            g=data.get('g', 0),
-            b=data.get('b', 0),
-            w=data.get('w', 0)
+            data.get('r', 0),
+            data.get('g', 0),
+            data.get('b', 0),
+            data.get('w', 0)
         )
 
     def to_list(self) -> List[int]:
@@ -107,10 +126,10 @@ class RGBW:
     def from_list(cls, data: List[int]) -> 'RGBW':
         """Create RGBW from list format [r, g, b, w]"""
         return cls(
-            r=data[0] if len(data) > 0 else 0,
-            g=data[1] if len(data) > 1 else 0,
-            b=data[2] if len(data) > 2 else 0,
-            w=data[3] if len(data) > 3 else 0
+            data[0] if len(data) > 0 else 0,
+            data[1] if len(data) > 1 else 0,
+            data[2] if len(data) > 2 else 0,
+            data[3] if len(data) > 3 else 0
         )
 
 def Color(red: int, green: int, blue: int, white: int = 0) -> RGBW:
