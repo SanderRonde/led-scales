@@ -22,12 +22,14 @@ PACKAGE_CONFIG: Dict[str, Any] = {
     },
     'extras_require': {
         'led': [
+            'pylint',
             'flask',  # Required for mock implementation
             'watchdog',  # Required for development mode
             'Flask-SocketIO',  # Required for real-time updates
             'python-socketio',  # Required for real-time updates
         ],
         'cad': [
+            'pylint',
             'numpy',  # Required for CAD generation
             'openpyscad',  # Required for CAD generation
             'scipy',  # Required for CAD generation

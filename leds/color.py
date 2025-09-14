@@ -7,12 +7,11 @@ class RGBW(int):
     def __new__(cls, r: int, g: Optional[int]=None, b: Optional[int]=None, w: Optional[int]=None):
         if (g, b, w) == (None, None, None):
             return int.__new__(cls, r)
-        else:
-            if w is None:
-                w = 0
-            if g is None or b is None:
-                raise ValueError("Either only the first arg or all three must be provided")
-            return int.__new__(cls, (w << 24) | (r << 16) | (g << 8) | b)
+        if w is None:
+            w = 0
+        if g is None or b is None:
+            raise ValueError("Either only the first arg or all three must be provided")
+        return int.__new__(cls, (w << 24) | (r << 16) | (g << 8) | b)
 
     @property
     def r(self):

@@ -34,7 +34,7 @@ class MockPixelStrip:
     def setPixelColor(self, n: int, color: RGBW):
         self._buffer[n] = color
 
-    def setPixelColorRGB(self, n: int, red: int, green: int, blue: int, white: int = 0):
+    def setPixelColorRGB(self, n: int, red: int, green: int, blue: int, white: int = 0):  # pylint: disable=too-many-positional-arguments
         self.setPixelColor(n, RGBW(red, green, blue, white))
 
     def getBrightness(self):
