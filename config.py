@@ -64,7 +64,7 @@ class ScaleConfig(BaseConfig):
     # Debug
     is_fast: bool = False
 
-    def __post_init__(self):
+    def validate(self):
         # Adjust print bed dimensions
         if len(self.pins) != self.panel_count:
             raise ValueError(
@@ -146,9 +146,10 @@ class HexConfig(BaseConfig):
             Hexagon(2, 2, [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]),
         ]
 
-    def __post_init__(self):
+    def validate(self):
+        print("Post init")
         for hexagon in self.hexagons:
-            if hexagon.x % 2 == 0:
+            if hexagon.x % 2 == 1:
                 if hexagon.y % 1 != 0.5:
                     raise ValueError(
                         f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected half-digit number")
@@ -160,20 +161,22 @@ class HexConfig(BaseConfig):
             max_led_index = 0
             for hexagon in self.hexagons:
                 max_led_index = max(max_led_index, *hexagon.ordered_leds)
-            if max_led_index != len(hexagon.ordered_leds) - 1:
+            if max_led_index != self.get_led_count() - 1:
                 raise ValueError(
-                    f"Hexagon {hexagon.x}, {hexagon.y} has {len(hexagon.ordered_leds)} LEDs, expected {max_led_index + 1}")
+                    f"Hexagon has {max_led_index + 1} LEDs, expected {self.get_led_count()}")
 
     def get_led_count(self) -> int:
         return sum(len(hexagon.ordered_leds) for hexagon in self.hexagons)
 
-    pins: Tuple[int, int] = (13, 1)
+    pins: Tuple[int, int] = (18, 0)
 
 
 # Change this to choose the config you want
-# _config = HexConfig()
-_config = ScaleConfig()
+_config = HexConfig()
+# _config = ScaleConfig()
 
+# Always validate the config
+_config.validate()
 
 def get_config() -> BaseConfig:
     return _config
