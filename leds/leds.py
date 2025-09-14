@@ -244,8 +244,8 @@ class LEDs:
     def listen(self) -> None:
         """Start the web server in the main thread"""
         print(
-            f"LEDs web server running on http://localhost:{self.config.web_port}")
-        self._socketio.run(self._app, port=self.config.web_port,  # type: ignore
+            f"LEDs web server running on http://0.0.0.0:{self.config.web_port}")
+        self._socketio.run(self._app, host='0.0.0.0', port=self.config.web_port,  # type: ignore
                            debug=False, use_reloader=False)
 
     def set_effect(self, effect_name: str) -> Effect:
