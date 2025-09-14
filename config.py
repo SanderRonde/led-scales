@@ -172,8 +172,8 @@ class HexConfig(BaseConfig):
 
 
 # Change this to choose the config you want
-_config = HexConfig()
-# _config = ScaleConfig()
+# _config = HexConfig()
+_config = ScaleConfig()
 
 # Always validate the config
 _config.validate()
