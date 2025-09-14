@@ -30,7 +30,7 @@ class ControllerBase(ABC):
 
     @staticmethod
     def init_strip(PixelStrip: Type[MockPixelStrip], led_count: int, pin: int, channel: int):
-        return PixelStrip(
+        strip = PixelStrip(
             num=led_count,
             pin=pin,
             brightness=255,
@@ -39,6 +39,8 @@ class ControllerBase(ABC):
             invert=False,
             channel=channel
         )
+        strip.begin()
+        return strip
 
     @cache  # pylint: disable=method-cache-max-size-none
     def get_max_distance(self) -> float:
