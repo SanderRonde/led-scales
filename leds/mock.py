@@ -49,13 +49,13 @@ class MockPixelStrip:
     def numPixels(self):
         return len(self)
 
-    def getPixelColor(self, n: int):
+    def getPixelColor(self, n: int) -> int:
         return self._pixels[n]
 
-    def getPixelColorRGB(self, n: int):
+    def getPixelColorRGB(self, n: int) -> RGBW:
         pixel = self._pixels[n]
         return RGBW(pixel.r, pixel.g, pixel.b, pixel.w)
 
-    def getPixelColorRGBW(self, n: int):
+    def getPixelColorRGBW(self, n: int) -> RGBW:
         pixel = self._pixels[n]
         return RGBW(pixel.r, pixel.g, pixel.b, pixel.w)

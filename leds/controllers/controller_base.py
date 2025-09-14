@@ -127,7 +127,7 @@ class ControllerBase(ABC):
         for strip in self.get_strips():
             strip_pixels: List[Dict[str, int]] = []
             for i in range(strip.numPixels()):
-                pixel = strip.getPixelColor(i)
+                pixel = strip.getPixelColorRGBW(i)
                 strip_pixels.append(
                     {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': strip.getBrightness()})
             pixels.append(strip_pixels)
