@@ -244,6 +244,32 @@
         .enum-input select {
             width: 100%;
         }
+
+        .hex-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 16px 0;
+            padding: 12px;
+            background: var(--background);
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .hex-button {
+            margin: 0 !important;
+            padding: 8px 12px !important;
+            min-width: 60px;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .hex-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 </head>

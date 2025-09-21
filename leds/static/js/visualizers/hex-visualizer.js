@@ -173,11 +173,6 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
      * Initialize setup mode UI and event handlers
      */
     initializeSetupMode() {
-        // Add click handler to canvas
-        this.canvas.addEventListener("click", (event) => {
-            this.handleCanvasClick(event);
-        });
-
         // Create setup UI
         this.createSetupUI();
 
@@ -202,50 +197,6 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
         }
     }
 
-    /**
-     * Handle canvas clicks in setup mode
-     */
-    handleCanvasClick(event) {
-        if (!this.config.setup_mode) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        // Find which hexagon was clicked
-        const scale = this.getScale();
-        const hexIndex = this.findHexagonAtPosition(x / scale, y / scale);
-        if (hexIndex !== -1) {
-            this.assignCurrentLedToHex(hexIndex);
-        }
-    }
-
-    /**
-     * Find which hexagon contains the given position
-     */
-    findHexagonAtPosition(x, y) {
-        const scale = this.getScale();
-
-        for (
-            let hexIndex = 0;
-            hexIndex < this.config.hexagons.length;
-            hexIndex++
-        ) {
-            const hexagon = this.config.hexagons[hexIndex];
-            const centerX = (hexagon.x + 0.5) * this.config.hex_size * scale;
-            const centerY =
-                this.canvas.height -
-                (hexagon.y + 0.5) * this.config.hex_size * scale;
-
-            const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
-            const hexRadius = (this.config.hex_size / 2) * scale;
-
-            if (distance <= hexRadius) {
-                return hexIndex;
-            }
-        }
-        return -1;
-    }
 
     /**
      * Assign the current LED to a hexagon
@@ -319,7 +270,10 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
             <h2>LED Setup Mode</h2>
             <div class="setup-info">
                 <p>Current LED: <span id="current-led">${this.currentLedIndex}</span></p>
-                <p>Click on a hexagon to assign the current LED to it.</p>
+                <p>Click a hex button below to assign the current LED to it.</p>
+            </div>
+            <div class="hex-buttons" id="hex-buttons">
+                ${this.createHexButtons()}
             </div>
             <div class="setup-controls">
                 <button id="reset-setup">Reset All</button>
@@ -346,6 +300,39 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
         document.getElementById("copy-config").addEventListener("click", () => {
             this.copyConfigToClipboard();
         });
+
+        // Add hex button event listeners
+        this.addHexButtonListeners();
+    }
+
+    /**
+     * Create hex buttons HTML
+     */
+    createHexButtons() {
+        let buttonsHTML = '';
+        for (let i = 0; i < this.config.hexagons.length; i++) {
+            const hexagon = this.config.hexagons[i];
+            const ledCount = hexagon.setup_mode_leds ? hexagon.setup_mode_leds.length : 0;
+            buttonsHTML += `
+                <button class="hex-button" data-hex-index="${i}" style="margin: 2px; padding: 8px; min-width: 60px; background: ${ledCount > 0 ? '#4CAF50' : '#666'};">
+                    H${i} (${ledCount})
+                </button>
+            `;
+        }
+        return buttonsHTML;
+    }
+
+    /**
+     * Add event listeners to hex buttons
+     */
+    addHexButtonListeners() {
+        const hexButtons = document.querySelectorAll('.hex-button');
+        hexButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                const hexIndex = parseInt(event.target.getAttribute('data-hex-index'));
+                this.assignCurrentLedToHex(hexIndex);
+            });
+        });
     }
 
     /**
@@ -355,6 +342,13 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
         const currentLedElement = document.getElementById("current-led");
         if (currentLedElement) {
             currentLedElement.textContent = this.currentLedIndex;
+        }
+
+        // Update hex buttons
+        const hexButtonsContainer = document.getElementById("hex-buttons");
+        if (hexButtonsContainer) {
+            hexButtonsContainer.innerHTML = this.createHexButtons();
+            this.addHexButtonListeners();
         }
     }
 
