@@ -11,7 +11,7 @@ from typing import Union, List, TextIO, Literal
 
 
 def print_output(pipe: TextIO) -> None:
-    for line in iter(pipe.readline, ''):
+    for line in iter(pipe.readline, ""):
         if line.strip():  # Only print non-empty lines
             # Force immediate output
             print(line.strip(), flush=True)
@@ -28,13 +28,15 @@ def run_command(cmd: Union[str, List[str]], shell: bool = True) -> None:
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,  # Line buffered
-            universal_newlines=True
+            universal_newlines=True,
         ) as process:
             # Start threads to read stdout and stderr
             stdout_thread = threading.Thread(
-                target=print_output, args=(process.stdout,))
+                target=print_output, args=(process.stdout,)
+            )
             stderr_thread = threading.Thread(
-                target=print_output, args=(process.stderr,))
+                target=print_output, args=(process.stderr,)
+            )
 
             stdout_thread.start()
             stderr_thread.start()
@@ -50,7 +52,9 @@ def run_command(cmd: Union[str, List[str]], shell: bool = True) -> None:
 
                         if return_code != 0:
                             print(
-                                f"Error: Command failed with exit code {return_code}", flush=True)
+                                f"Error: Command failed with exit code {return_code}",
+                                flush=True,
+                            )
                             sys.exit(1)
                         break
                 except KeyboardInterrupt:
@@ -58,7 +62,7 @@ def run_command(cmd: Union[str, List[str]], shell: bool = True) -> None:
                     if sys.platform == "win32":
                         process.terminate()
                     else:
-                        if hasattr(os, 'killpg'):
+                        if hasattr(os, "killpg"):
                             os.killpg(os.getpgid(process.pid), signal.SIGINT)
                         else:
                             process.terminate()
@@ -71,12 +75,12 @@ def run_command(cmd: Union[str, List[str]], shell: bool = True) -> None:
         sys.exit(1)
 
 
-def get_venv_path(venv_type: Literal['cad', 'led']) -> Path:
+def get_venv_path(venv_type: Literal["cad", "led"]) -> Path:
     """Get the path for a specific virtual environment"""
     return Path(f"venv-{venv_type}")
 
 
-def get_venv_python(venv_type: Literal['cad', 'led']) -> str:
+def get_venv_python(venv_type: Literal["cad", "led"]) -> str:
     """Get the Python executable path for a specific virtual environment"""
     venv_path = get_venv_path(venv_type)
     if sys.platform == "win32":
@@ -84,7 +88,7 @@ def get_venv_python(venv_type: Literal['cad', 'led']) -> str:
     return str(venv_path / "bin" / "python")
 
 
-def get_venv_activate(venv_type: Literal['cad', 'led']) -> Path:
+def get_venv_activate(venv_type: Literal["cad", "led"]) -> Path:
     """Get the activation script path for a specific virtual environment"""
     venv_path = get_venv_path(venv_type)
     if sys.platform == "win32":
@@ -92,7 +96,7 @@ def get_venv_activate(venv_type: Literal['cad', 'led']) -> Path:
     return venv_path / "bin" / "activate"
 
 
-def setup_venv(venv_type: Literal['cad', 'led']) -> None:
+def setup_venv(venv_type: Literal["cad", "led"]) -> None:
     """Set up a specific virtual environment"""
     print(f"Setting up {venv_type} virtual environment...")
     venv_path = get_venv_path(venv_type)
@@ -113,10 +117,10 @@ def setup_venv(venv_type: Literal['cad', 'led']) -> None:
 
 def generate_cad(mode: str = "") -> None:
     print("Setting up CAD environment...")
-    setup_venv('cad')
+    setup_venv("cad")
 
     print("Generating CAD files...")
-    activate_script = get_venv_activate('cad')
+    activate_script = get_venv_activate("cad")
     if sys.platform == "win32":
         cmd = f'"{activate_script}" && python cad/led-scales.py {mode}'
     else:
@@ -128,10 +132,10 @@ def generate_cad(mode: str = "") -> None:
 
 def run_leds(mock: bool = False) -> None:
     print("Setting up LED environment...")
-    setup_venv('led')
+    setup_venv("led")
 
     print("Running LED implementation...")
-    activate_script = get_venv_activate('led')
+    activate_script = get_venv_activate("led")
     if sys.platform == "win32":
         cmd = f'"{activate_script}" && leds {"--mock" if mock else ""}'
     else:
@@ -146,7 +150,7 @@ def clean() -> None:
         "cad/__pycache__",
         "venv-cad",
         "venv-led",
-        "cad/out"
+        "cad/out",
     ]
 
     for path in paths_to_clean:
@@ -165,27 +169,57 @@ def clean() -> None:
 def lint() -> None:
     """Run pylint on the codebase"""
     print("Setting up CAD environment for linting...")
-    setup_venv('cad')  # CAD environment has pylint
+    setup_venv("cad")  # CAD environment has pylint
 
     print("Running pylint...")
-    python_exe = get_venv_python('cad')
+    python_exe = get_venv_python("cad")
     cmd = f'"{python_exe}" -m pylint --rcfile=.pylintrc leds/ cad/ main.py config.py'
     run_command(cmd)
 
 
+def format_code() -> None:
+    """Format the codebase using black"""
+    print("Setting up CAD environment for formatting...")
+    setup_venv("cad")  # CAD environment has black
+
+    print("Formatting code with black...")
+    python_exe = get_venv_python("cad")
+    cmd = f'"{python_exe}" -m black leds/ cad/ main.py config.py'
+    run_command(cmd)
+    print("Code formatting complete!")
+
+
+def format_check() -> None:
+    """Check if the codebase is properly formatted using black"""
+    print("Setting up CAD environment for format checking...")
+    setup_venv("cad")  # CAD environment has black
+
+    print("Checking code formatting with black...")
+    python_exe = get_venv_python("cad")
+    cmd = f'"{python_exe}" -m black --check --diff leds/ cad/ main.py config.py'
+    run_command(cmd)
+    print("Format check complete!")
+
+
 def print_help() -> None:
     print("LED Scales CAD Generator:")
-    print("  python main.py setup    - Set up both development environments")
-    print("  python main.py generate - Generate CAD files (default mode)")
-    print("  python main.py 3d       - Generate 3D printable STL files for the scales")
-    print("  python main.py 2d       - Generate 2D SVG files for laser cutting/CNC")
-    print("  python main.py clean    - Clean up generated files and environments")
-    print("  python main.py all      - Generate all needed files")
-    print("  python main.py help     - Show this help message")
-    print("  python main.py leds     - Run the LED implementation")
-    print("  python main.py leds-mock - Run the LED implementation in mock mode")
-    print("  python main.py dev      - Run the server in development mode with auto-reload")
-    print("  python main.py lint     - Run pylint on the codebase")
+    print("  python main.py setup       - Set up both development environments")
+    print("  python main.py generate    - Generate CAD files (default mode)")
+    print(
+        "  python main.py 3d          - Generate 3D printable STL files for the scales"
+    )
+    print("  python main.py 2d          - Generate 2D SVG files for laser cutting/CNC")
+    print("  python main.py clean       - Clean up generated files and environments")
+    print("  python main.py all         - Generate all needed files")
+    print("  python main.py help        - Show this help message")
+    print("  python main.py leds        - Run the LED implementation")
+    print("  python main.py leds-mock   - Run the LED implementation in mock mode")
+    print(
+        "  python main.py dev         - Run the server in development mode with auto-reload"
+    )
+    print("  python main.py lint        - Run pylint on the codebase")
+    print("  python main.py format      - Format the codebase using black")
+    print("  python main.py format-check - Check if the codebase is properly formatted")
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -194,14 +228,19 @@ def print_help() -> None:
 def dev() -> None:
     """Run the server in development mode with auto-reload"""
     print("Setting up LED environment...")
-    setup_venv('led')
+    setup_venv("led")
 
     print("Starting development server with auto-reload...")
 
     try:
         # Only import watchdog when needed
-        from watchdog.observers import Observer  # pylint: disable=import-outside-toplevel
-        from watchdog.events import FileSystemEventHandler, FileSystemEvent  # pylint: disable=import-outside-toplevel
+        from watchdog.observers import (
+            Observer,
+        )  # pylint: disable=import-outside-toplevel
+        from watchdog.events import (
+            FileSystemEventHandler,
+            FileSystemEvent,
+        )  # pylint: disable=import-outside-toplevel
 
         class RestartHandler(FileSystemEventHandler):
             def __init__(self):
@@ -217,12 +256,11 @@ def dev() -> None:
                 print("\nStarting server...")
 
                 # Use python from venv
-                python_executable = get_venv_python('led')
+                python_executable = get_venv_python("led")
 
-                cmd = [python_executable, '-m', 'leds.leds', '--mock']
+                cmd = [python_executable, "-m", "leds.leds", "--mock"]
                 self.process = subprocess.Popen(  # pylint: disable=consider-using-with
-                    cmd,
-                    start_new_session=sys.platform != "win32"
+                    cmd, start_new_session=sys.platform != "win32"
                 )
 
             def stop_process(self):
@@ -230,9 +268,11 @@ def dev() -> None:
                     try:
                         if sys.platform == "win32":
                             subprocess.run(
-                                ['taskkill', '/F', '/T', '/PID', str(self.process.pid)], check=False)
+                                ["taskkill", "/F", "/T", "/PID", str(self.process.pid)],
+                                check=False,
+                            )
                         else:
-                            if hasattr(os, 'killpg'):
+                            if hasattr(os, "killpg"):
                                 pgid = os.getpgid(self.process.pid)
                                 os.killpg(pgid, signal.SIGTERM)
                             else:
@@ -246,7 +286,10 @@ def dev() -> None:
                         self.process = None
 
             def on_modified(self, event: FileSystemEvent) -> None:
-                if not event.is_directory and (str(event.src_path).endswith('.py') or str(event.src_path).endswith('.js')):
+                if not event.is_directory and (
+                    str(event.src_path).endswith(".py")
+                    or str(event.src_path).endswith(".js")
+                ):
                     current_time = time.time()
                     if current_time - self.last_restart > self.cooldown:
                         self.last_restart = current_time
@@ -276,7 +319,9 @@ def dev() -> None:
 
     except ImportError:
         print("Error: watchdog package is not installed.")
-        print("Please run 'python main.py setup' first to set up the virtual environment and source it.")
+        print(
+            "Please run 'python main.py setup' first to set up the virtual environment and source it."
+        )
         print("This will install all required dependencies including watchdog.")
         sys.exit(1)
 
@@ -289,8 +334,8 @@ if __name__ == "__main__":
     command = sys.argv[1]
 
     if command == "setup":
-        setup_venv('cad')
-        setup_venv('led')
+        setup_venv("cad")
+        setup_venv("led")
     elif command == "generate":
         generate_cad()
     elif command == "2d":
@@ -309,14 +354,24 @@ if __name__ == "__main__":
         dev()  # New development mode with auto-reload
     elif command == "lint":
         lint()  # New lint command
+    elif command == "format":
+        format_code()  # New format command
+    elif command == "format-check":
+        format_check()  # New format check command
     elif command == "all":
         print("Generating 3D print files...")
         generate_cad("--3d")
         print("Generating 2D files...")
         generate_cad("--2d")
-        print("STL files can be found in cad/out/tiles/. Slice and print these with your 3D printer.")
-        print("SVG files can be found in cad/out/panels. Have these printed out on paper.")
-        print("Order the panels based on the provided panel count and dimensions. Put the paper over it. Drill marked holes for the LEDs and put the printed scales on the marked positions. Use cad/out/led-scales-py.positioning.scad to map printed scales to the panels.")
+        print(
+            "STL files can be found in cad/out/tiles/. Slice and print these with your 3D printer."
+        )
+        print(
+            "SVG files can be found in cad/out/panels. Have these printed out on paper."
+        )
+        print(
+            "Order the panels based on the provided panel count and dimensions. Put the paper over it. Drill marked holes for the LEDs and put the printed scales on the marked positions. Use cad/out/led-scales-py.positioning.scad to map printed scales to the panels."
+        )
         print("Done!")
     else:
         print(f"Unknown command: {command}")

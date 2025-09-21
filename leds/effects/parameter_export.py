@@ -1,4 +1,5 @@
 """Utility for exporting effect parameters to frontend-friendly formats"""
+
 from typing import Dict, Any
 from leds.effects.parameters import Parameter
 from leds.effects.effect import Effect
