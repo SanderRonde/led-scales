@@ -162,7 +162,6 @@ class HexConfig(BaseConfig):
         ]
 
     def validate(self):
-        print("Post init")
         for hexagon in self.hexagons:
             if hexagon.x % 2 == 1:
                 if hexagon.y % 1 != 0.5:
