@@ -32,12 +32,14 @@ class SingleColorRadialEffect(Effect):
         return Color(
             math.floor(color.r * final_brightness),
             math.floor(color.g * final_brightness),
-            math.floor(color.b * final_brightness)
+            math.floor(color.b * final_brightness),
         )
 
     def run(self, ms: int):
         offset = Effect.time_offset(
-            ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value())
-        self.controller.map_scaled_distance(lambda distance, index: self.color_at_distance(
-            ((distance) + offset) % 1))
+            ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value()
+        )
+        self.controller.map_scaled_distance(
+            lambda distance, index: self.color_at_distance(((distance) + offset) % 1)
+        )
         self.controller.show()

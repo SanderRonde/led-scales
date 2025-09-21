@@ -3,6 +3,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from leds import controllers
+
 # Unless otherwise specified, all dimensions are in mm
 
 
@@ -19,7 +20,8 @@ class ScaleConfig(BaseConfig):
     web_port: int = 5001
     # A tuple of (pin, channel) per panel
     pins: List[Tuple[int, int]] = field(
-        default_factory=lambda: [(13, 1), (19, 1), (26, 2)])
+        default_factory=lambda: [(13, 1), (19, 1), (26, 2)]
+    )
 
     # Scale dimensions
     base_length: float = 25
@@ -54,8 +56,7 @@ class ScaleConfig(BaseConfig):
     y_print_additional_spacing: float = 10
     print_outside_padding: float = 10
     # You'll want to change this
-    scad_path: Union[str,
-                     Path] = "B:/programs/Program Files/OpenSCAD/openscad.exe"
+    scad_path: Union[str, Path] = "B:/programs/Program Files/OpenSCAD/openscad.exe"
     x_per_build_plate_override: Optional[int] = None
     y_per_build_plate_override: Optional[int] = None
     # This is purely visual and doesn't affect the result
@@ -68,7 +69,8 @@ class ScaleConfig(BaseConfig):
         # Adjust print bed dimensions
         if len(self.pins) != self.panel_count:
             raise ValueError(
-                f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})")
+                f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})"
+            )
         if self.panel_count % 2 != 1:
             raise ValueError("Panel count must be an odd number")
 
@@ -83,18 +85,20 @@ class ScaleConfig(BaseConfig):
     @property
     def panel_height(self) -> float:
         return (self.y_count + 0.5) * self.spacing
-    
+
     @property
     def print_bed_x(self) -> float:
         return self.x_print_bed - (self.print_outside_padding * 2)
-    
+
     @property
     def print_bed_y(self) -> float:
         return self.y_print_bed - (self.print_outside_padding * 2)
 
     @property
     def total_width(self) -> float:
-        return self.panel_width * self.panel_count + (self.spacing * (self.panel_count - 1))
+        return self.panel_width * self.panel_count + (
+            self.spacing * (self.panel_count - 1)
+        )
 
     @property
     def total_height(self) -> float:
@@ -127,11 +131,7 @@ class Hexagon:
         self.ordered_leds = ordered_leds
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            'x': self.x,
-            'y': self.y,
-            'ordered_leds': self.ordered_leds
-        }
+        return {"x": self.x, "y": self.y, "ordered_leds": self.ordered_leds}
 
 
 class HexConfig(BaseConfig):
@@ -152,18 +152,21 @@ class HexConfig(BaseConfig):
             if hexagon.x % 2 == 1:
                 if hexagon.y % 1 != 0.5:
                     raise ValueError(
-                        f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected half-digit number")
+                        f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected half-digit number"
+                    )
             else:
                 if hexagon.y % 1 != 0:
                     raise ValueError(
-                        f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected integer")
+                        f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected integer"
+                    )
 
             max_led_index = 0
             for hexagon in self.hexagons:
                 max_led_index = max(max_led_index, *hexagon.ordered_leds)
             if max_led_index != self.get_led_count() - 1:
                 raise ValueError(
-                    f"Hexagon has {max_led_index + 1} LEDs, expected {self.get_led_count()}")
+                    f"Hexagon has {max_led_index + 1} LEDs, expected {self.get_led_count()}"
+                )
 
     def get_led_count(self) -> int:
         return sum(len(hexagon.ordered_leds) for hexagon in self.hexagons)
@@ -177,6 +180,7 @@ _config = ScaleConfig()
 
 # Always validate the config
 _config.validate()
+
 
 def get_config() -> BaseConfig:
     return _config

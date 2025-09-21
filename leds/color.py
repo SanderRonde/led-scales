@@ -1,10 +1,18 @@
 """RGBW color model implementation"""
+
 from typing import Dict, List, Tuple, Optional
 
 
 class RGBW(int):
     """Represents a color in RGBW format"""
-    def __new__(cls, r: int, g: Optional[int]=None, b: Optional[int]=None, w: Optional[int]=None):
+
+    def __new__(
+        cls,
+        r: int,
+        g: Optional[int] = None,
+        b: Optional[int] = None,
+        w: Optional[int] = None,
+    ):
         if (g, b, w) == (None, None, None):
             return int.__new__(cls, r)
         if w is None:
@@ -15,19 +23,19 @@ class RGBW(int):
 
     @property
     def r(self):
-        return (self >> 16) & 0xff
+        return (self >> 16) & 0xFF
 
     @property
     def g(self):
-        return (self >> 8) & 0xff
+        return (self >> 8) & 0xFF
 
     @property
     def b(self):
-        return (self) & 0xff
+        return (self) & 0xFF
 
     @property
     def w(self):
-        return (self >> 24) & 0xff
+        return (self >> 24) & 0xFF
 
     @property
     def hsv(self) -> Tuple[float, float, float]:
@@ -41,7 +49,7 @@ class RGBW(int):
         r = self.r / 255.0
         g = self.g / 255.0
         b = self.b / 255.0
-        
+
         cmax = max(r, g, b)
         cmin = min(r, g, b)
         diff = cmax - cmin
@@ -65,7 +73,7 @@ class RGBW(int):
         return (h, s, v)
 
     @classmethod
-    def from_hsv(cls, h: float, s: float, v: float, w: int = 0) -> 'RGBW':
+    def from_hsv(cls, h: float, s: float, v: float, w: int = 0) -> "RGBW":
         """Create RGBW from HSV values
         Args:
             h (float): Hue in range [0, 360)
@@ -96,25 +104,17 @@ class RGBW(int):
         else:
             r, g, b = c, 0, x
 
-        return cls(
-            int((r + m) * 255),
-            int((g + m) * 255),
-            int((b + m) * 255),
-            w
-        )
+        return cls(int((r + m) * 255), int((g + m) * 255), int((b + m) * 255), w)
 
     def to_dict(self) -> Dict[str, int]:
         """Convert RGBW to dictionary format"""
-        return {'r': self.r, 'g': self.g, 'b': self.b, 'w': self.w}
+        return {"r": self.r, "g": self.g, "b": self.b, "w": self.w}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, int]) -> 'RGBW':
+    def from_dict(cls, data: Dict[str, int]) -> "RGBW":
         """Create RGBW from dictionary format"""
         return cls(
-            data.get('r', 0),
-            data.get('g', 0),
-            data.get('b', 0),
-            data.get('w', 0)
+            data.get("r", 0), data.get("g", 0), data.get("b", 0), data.get("w", 0)
         )
 
     def to_list(self) -> List[int]:
@@ -122,14 +122,15 @@ class RGBW(int):
         return [self.r, self.g, self.b, self.w]
 
     @classmethod
-    def from_list(cls, data: List[int]) -> 'RGBW':
+    def from_list(cls, data: List[int]) -> "RGBW":
         """Create RGBW from list format [r, g, b, w]"""
         return cls(
             data[0] if len(data) > 0 else 0,
             data[1] if len(data) > 1 else 0,
             data[2] if len(data) > 2 else 0,
-            data[3] if len(data) > 3 else 0
+            data[3] if len(data) > 3 else 0,
         )
+
 
 def Color(red: int, green: int, blue: int, white: int = 0) -> RGBW:
     """Convert the provided red, green, blue color to a 24-bit color value.
