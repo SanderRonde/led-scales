@@ -30,7 +30,7 @@ class SetupModeEffect(Effect):
         self.controller.set_color(RGBW(0, 0, 0, 0))
 
         # Blink the current LED
-        if ms - self.last_update >= 50:  # Toggle every 500ms
+        if ms - self.last_update >= 500:  # Toggle every 500ms
             self.blink_state = not self.blink_state
             self.last_update = ms
 
