@@ -7,7 +7,7 @@ import time
 
 def main():
     config = HexConfig()
-    PixelStrip, _ = get_library(True)
+    PixelStrip, _ = get_library(False)
     (pin, channel) = config.pins
     
     strip = PixelStrip(
