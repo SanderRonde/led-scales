@@ -88,5 +88,4 @@ class HexPanelLEDController(ControllerBase):
             'max_x': self.max_x,
             'max_y': self.max_y,
             'hexagons': [hexagon.to_dict() for hexagon in self.config.hexagons],
-            'setup_mode': self.config.is_setup_mode(),
         }

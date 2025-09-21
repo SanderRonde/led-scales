@@ -13,10 +13,6 @@ class BaseConfig(ABC):
     def get_led_count(self) -> int:
         pass
 
-    @abstractmethod
-    def is_setup_mode(self) -> bool:
-        pass
-
 
 @dataclass
 class ScaleConfig(BaseConfig):
@@ -76,9 +72,6 @@ class ScaleConfig(BaseConfig):
         if self.panel_count % 2 != 1:
             raise ValueError("Panel count must be an odd number")
 
-    def is_setup_mode(self) -> bool:
-        return False
-
     @property
     def spike_height(self) -> float:
         return self.base_height - self.spike_size
@@ -90,11 +83,11 @@ class ScaleConfig(BaseConfig):
     @property
     def panel_height(self) -> float:
         return (self.y_count + 0.5) * self.spacing
-
+    
     @property
     def print_bed_x(self) -> float:
         return self.x_print_bed - (self.print_outside_padding * 2)
-
+    
     @property
     def print_bed_y(self) -> float:
         return self.y_print_bed - (self.print_outside_padding * 2)
@@ -128,33 +121,29 @@ class ScaleConfig(BaseConfig):
 
 
 class Hexagon:
-    setup_mode_leds: List[int]
-    
     def __init__(self, x: float, y: float, ordered_leds: List[int]):
         self.x = x
         self.y = y
         self.ordered_leds = ordered_leds
-        self.setup_mode_leds = []
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             'x': self.x,
             'y': self.y,
-            'ordered_leds': self.ordered_leds,
-            'setup_mode_leds': self.setup_mode_leds
+            'ordered_leds': self.ordered_leds
         }
 
 
 class HexConfig(BaseConfig):
     def __init__(self):
         self.hexagons = [
-            Hexagon(0, 0, []),
-            Hexagon(0, 1, []),
-            Hexagon(1, 0.5, []),
-            Hexagon(1, 1.5, []),
-            Hexagon(2, 0, []),
-            Hexagon(2, 1, []),
-            Hexagon(2, 2, []),
+            Hexagon(0, 0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+            Hexagon(0, 1, [50, 51, 52, 53, 54, 55, 56, 57, 58, 59]),
+            Hexagon(1, 0.5, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+            Hexagon(1, 1.5, [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]),
+            Hexagon(2, 0, [60, 61, 62, 63, 64, 65, 66, 67, 68, 69]),
+            Hexagon(2, 1, [30, 31, 32, 33, 34, 35, 36, 37, 38, 39]),
+            Hexagon(2, 2, [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]),
         ]
 
     def validate(self):
@@ -169,36 +158,25 @@ class HexConfig(BaseConfig):
                     raise ValueError(
                         f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected integer")
 
-        # Only validate LED indices if not in setup mode
-        if not self.is_setup_mode():
             max_led_index = 0
             for hexagon in self.hexagons:
-                if hexagon.ordered_leds:  # Only check non-empty lists
-                    max_led_index = max(max_led_index, *hexagon.ordered_leds)
+                max_led_index = max(max_led_index, *hexagon.ordered_leds)
             if max_led_index != self.get_led_count() - 1:
                 raise ValueError(
                     f"Hexagon has {max_led_index + 1} LEDs, expected {self.get_led_count()}")
 
     def get_led_count(self) -> int:
-        if self.is_setup_mode():
-            # In setup mode, assume a practically infinite number of LEDs
-            return len(self.hexagons) * 100
         return sum(len(hexagon.ordered_leds) for hexagon in self.hexagons)
-
-    def is_setup_mode(self) -> bool:
-        """Check if we're in setup mode (any hexagon has empty LED list)"""
-        return any(len(hexagon.ordered_leds) == 0 for hexagon in self.hexagons)
 
     pins: Tuple[int, int] = (18, 0)
 
 
 # Change this to choose the config you want
-_config = HexConfig()
-# _config = ScaleConfig()
+# _config = HexConfig()
+_config = ScaleConfig()
 
 # Always validate the config
 _config.validate()
-
 
 def get_config() -> BaseConfig:
     return _config

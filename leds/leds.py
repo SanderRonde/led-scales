@@ -5,16 +5,15 @@ import time
 import threading
 import logging
 import json
-from typing import Dict, Any, Union, List
+from typing import Dict, Any, Union
 from pathlib import Path
 from flask import Flask, render_template, jsonify, send_from_directory, request  # pylint: disable=import-error
 from flask_socketio import SocketIO  # pylint: disable=import-error
 from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
-from leds.effects.setup_mode import SetupModeEffect
 from leds.effects.rainbow_radial import RainbowRadialEffect
 from leds.controllers.controller_base import RGBW
-from config import get_led_controller, BaseConfig, get_config, HexConfig
+from config import get_led_controller, BaseConfig, get_config
 # Add parent directory to Python path when running directly
 if __name__ == '__main__':
     sys.path.append(os.path.dirname(
@@ -46,16 +45,12 @@ class LEDs:
         self._fade_duration = 300  # ms
         self._target_power_state = self._power_state
 
-        # Check if we're in setup mode and use setup effect
-        if self.config.is_setup_mode():
-            self._effect = self.set_effect(SetupModeEffect.__name__)
+        # Try to load saved effect, fall back to RainbowRadialEffect if none exists
+        saved_effect = self._config_data.get('effect_name')
+        if saved_effect and saved_effect in self._effects:
+            self._effect = self.set_effect(saved_effect)
         else:
-            # Try to load saved effect, fall back to RainbowRadialEffect if none exists
-            saved_effect = self._config_data.get('effect_name')
-            if saved_effect and saved_effect in self._effects:
-                self._effect = self.set_effect(saved_effect)
-            else:
-                self._effect = self.set_effect(RainbowRadialEffect.__name__)
+            self._effect = self.set_effect(RainbowRadialEffect.__name__)
 
     def _get_sleep_time(self) -> float:
         if self._controller.is_mock:
@@ -245,74 +240,6 @@ class LEDs:
                 'target_power_state': self._target_power_state,
                 'brightness': self._brightness
             })
-
-        @self._app.route('/setup/hex/assign', methods=['POST'])
-        def assign_led_to_hex():  # type: ignore  # pylint: disable=unused-variable
-            """Assign an LED to a hexagon during setup mode"""
-            if not isinstance(self.config, HexConfig) or not self.config.is_setup_mode():
-                return jsonify({'error': 'Not in setup mode'}), 400
-
-            data = request.get_json()
-            if not data or 'hex_index' not in data or 'led_index' not in data:
-                return jsonify({'error': 'Missing hex_index or led_index'}), 400
-
-            hex_index = data['hex_index']
-            led_index = data['led_index']
-
-            if hex_index < 0 or hex_index >= len(self.config.hexagons):
-                return jsonify({'error': 'Invalid hex_index'}), 400
-
-            # Add LED to the hexagon's ordered_leds list
-            self.config.hexagons[hex_index].setup_mode_leds.append(led_index)
-
-            return jsonify({
-                'success': True,
-                'hex_index': hex_index,
-                'led_index': led_index,
-            })
-
-        @self._app.route('/setup/hex/export', methods=['GET'])
-        def export_config():  # type: ignore  # pylint: disable=unused-variable
-            """Export the current hexagon configuration as copyable Python code"""
-            if not isinstance(self.config, HexConfig):
-                return jsonify({'error': 'Not using HexConfig'}), 400
-
-            config_lines: List[str] = []
-            config_lines.append("self.hexagons = [")
-            for hexagon in self.config.hexagons:
-                config_lines.append(
-                    f"    Hexagon({hexagon.x}, {hexagon.y}, {hexagon.setup_mode_leds}),")
-            config_lines.append("]")
-
-            return jsonify({
-                'config_code': '\n'.join(config_lines)
-            })
-
-        @self._app.route('/setup/hex/reset', methods=['POST'])
-        def reset_setup():  # type: ignore  # pylint: disable=unused-variable
-            """Reset all hexagon LED assignments"""
-            if not isinstance(self.config, HexConfig):
-                return jsonify({'error': 'Not using HexConfig'}), 400
-
-            for hexagon in self.config.hexagons:
-                hexagon.setup_mode_leds.clear()
-
-            return jsonify({'success': True})
-
-        @self._app.route('/setup/current-led', methods=['GET'])
-        def get_current_led():  # type: ignore  # pylint: disable=unused-variable
-            """Get the current LED index being assigned"""
-            if not isinstance(self._effect, SetupModeEffect):
-                return jsonify({'error': 'Not using SetupModeEffect'}), 400
-            return jsonify({'current_led': self._effect.current_led})
-
-        @self._app.route('/setup/next', methods=['POST'])
-        def next_led():  # type: ignore  # pylint: disable=unused-variable
-            """Get the current LED index being assigned"""
-            if not isinstance(self._effect, SetupModeEffect):
-                return jsonify({'error': 'Not using SetupModeEffect'}), 400
-            self._effect.next()
-            return jsonify({'success': True, 'current_led': self._effect.current_led})
 
     def listen(self) -> None:
         """Start the web server in the main thread"""
