@@ -1,15 +1,8 @@
-from leds.effects.effect import (
-    Effect,
-    SpeedWithDirectionParameters,
-    ColorMigration,
-    ColorInterpolationParameters,
-)
+from leds.effects.effect import Effect, SpeedWithDirectionParameters, ColorMigration, ColorInterpolationParameters
 from leds.controllers.controller_base import ControllerBase
 
 
-class RandomColorSingleParameters(
-    SpeedWithDirectionParameters, ColorInterpolationParameters
-):
+class RandomColorSingleParameters(SpeedWithDirectionParameters, ColorInterpolationParameters):
     pass
 
 
@@ -20,11 +13,11 @@ class RandomColorSingleEffect(Effect):
         self.color_migrations = ColorMigration()
 
     def run(self, ms: int):
-        offset = Effect.time_offset(ms, self.PARAMETERS.speed.get_value(), mod=False)
+        offset = Effect.time_offset(
+            ms, self.PARAMETERS.speed.get_value(), mod=False)
 
         color = self.color_migrations.run_iteration(
-            abs(offset), self.PARAMETERS.interpolation.get_value()
-        )
+            abs(offset), self.PARAMETERS.interpolation.get_value())
         self.controller.set_color(color)
 
         self.controller.show()

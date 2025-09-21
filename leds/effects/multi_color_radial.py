@@ -1,17 +1,11 @@
 import math
 from leds.controllers.controller_base import ControllerBase
 from leds.effects.parameters import ColorListParameter
-from leds.effects.effect import (
-    Effect,
-    SpeedWithDirectionParameters,
-    ColorInterpolationParameters,
-)
+from leds.effects.effect import Effect, SpeedWithDirectionParameters, ColorInterpolationParameters
 from leds.color import RGBW, Color
 
 
-class MultiColorRadialParameters(
-    SpeedWithDirectionParameters, ColorInterpolationParameters
-):
+class MultiColorRadialParameters(SpeedWithDirectionParameters, ColorInterpolationParameters):
     def __init__(self):
         super().__init__()
         self.colors = ColorListParameter(
@@ -31,21 +25,15 @@ class MultiColorRadialEffect(Effect):
             distance = 1 + distance
 
         colors = self.PARAMETERS.colors.get_value()
-        index = distance * (len(colors))
+        index = (distance * (len(colors)))
         lower_bound = math.floor(index)
-        upper_bound = 0 if index == len(colors) else math.ceil(index) % len(colors)
-        return Effect.interpolate_color(
-            colors[lower_bound],
-            colors[upper_bound],
-            (index - lower_bound) % 1,
-            self.PARAMETERS.interpolation.get_value(),
-        )
+        upper_bound = 0 if index == len(
+            colors) else math.ceil(index) % len(colors)
+        return Effect.interpolate_color(colors[lower_bound], colors[upper_bound], (index - lower_bound) % 1, self.PARAMETERS.interpolation.get_value())
 
     def run(self, ms: int):
         offset = Effect.time_offset(
-            ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value()
-        )
+            ms, self.PARAMETERS.speed.get_value(), self.PARAMETERS.direction.get_value())
         self.controller.map_scaled_distance(
-            lambda distance, index: self.color_at_distance(distance + offset)
-        )
+            lambda distance, index: self.color_at_distance(distance + offset))
         self.controller.show()

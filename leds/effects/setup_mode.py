@@ -1,5 +1,4 @@
 """Setup mode effect that blinks one LED at a time"""
-
 from typing import TYPE_CHECKING
 from leds.effects.effect import Effect
 from leds.color import RGBW
@@ -37,9 +36,6 @@ class SetupModeEffect(Effect):
         if self.blink_state:
             self.controller.set_pixel_color(
                 # For the time being only support 1 strip
-                0,
-                self.current_led,
-                RGBW(255, 255, 255, 0),
-            )
+                0, self.current_led, RGBW(255, 255, 255, 0))
 
         self.controller.show()

@@ -4,11 +4,9 @@ from abc import ABC, abstractmethod
 import math
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
-
 # Try to import the real library first
 try:
     from rpi_ws281x import PixelStrip as RealPixelStrip  # type: ignore
-
     real_library_available = True
 except ImportError:
     real_library_available = False
@@ -16,9 +14,7 @@ except ImportError:
 
 def get_library(mock: bool) -> Tuple[Type[Any], bool]:
     if not mock and not real_library_available:
-        print(
-            "Real LED library was forced but rpi_ws281x is not available, falling back to mock library"
-        )
+        print("Real LED library was forced but rpi_ws281x is not available, falling back to mock library")
         return (MockPixelStrip, False)
 
     if mock:
@@ -33,9 +29,7 @@ class ControllerBase(ABC):
         self.PixelStrip: Type[MockPixelStrip] = PixelStrip
 
     @staticmethod
-    def init_strip(
-        PixelStrip: Type[MockPixelStrip], led_count: int, pin: int, channel: int
-    ):
+    def init_strip(PixelStrip: Type[MockPixelStrip], led_count: int, pin: int, channel: int):
         strip = PixelStrip(
             num=led_count,
             pin=pin,
@@ -43,7 +37,7 @@ class ControllerBase(ABC):
             freq_hz=800000,
             dma=10,
             invert=False,
-            channel=channel,
+            channel=channel
         )
         strip.begin()
         return strip
@@ -52,9 +46,7 @@ class ControllerBase(ABC):
     def get_max_distance(self) -> float:
         highest = 0
 
-        def distance_callback(
-            distance: float, index: Tuple[int, int]
-        ) -> None:  # pylint: disable=unused-argument
+        def distance_callback(distance: float, index: Tuple[int, int]) -> None:  # pylint: disable=unused-argument
             nonlocal highest
             highest = max(highest, distance)
 
@@ -68,9 +60,7 @@ class ControllerBase(ABC):
         lowest_x = 0
         lowest_y = 0
 
-        def x_callback(
-            x: float, y: float, index: Tuple[int, int]
-        ) -> None:  # pylint: disable=unused-argument
+        def x_callback(x: float, y: float, index: Tuple[int, int]) -> None:  # pylint: disable=unused-argument
             nonlocal highest_x
             nonlocal highest_y
             nonlocal lowest_x
@@ -84,52 +74,29 @@ class ControllerBase(ABC):
         return highest_x, highest_y, lowest_x, lowest_y
 
     @abstractmethod
-    def map_coordinates(
-        self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]
-    ) -> None:
+    def map_coordinates(self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         pass
 
-    def map_distance(
-        self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]
-    ) -> None:
-        def coordinate_callback(
-            x: float, y: float, index: Tuple[int, int]
-        ) -> Union[RGBW, None]:
+    def map_distance(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
+        def coordinate_callback(x: float, y: float, index: Tuple[int, int]) -> Union[RGBW, None]:
             return callback(math.sqrt(x**2 + y**2), index)
 
         self.map_coordinates(coordinate_callback)
 
-    def map_scaled_coordinates(
-        self,
-        callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]],
-        force_positive: bool,
-    ) -> None:
+    def map_scaled_coordinates(self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]], force_positive: bool) -> None:
         max_x, max_y, lowest_x, lowest_y = self.get_x_y_limits()
-        self.map_coordinates(
-            lambda x, y, index: callback(
-                (x - lowest_x) / (max_x - lowest_x) if force_positive else x / max_x,
-                (y - lowest_y) / (max_y - lowest_y) if force_positive else y / max_y,
-                index,
-            )
-        )
+        self.map_coordinates(lambda x, y, index: callback(
+            (x - lowest_x) / (max_x - lowest_x) if force_positive else x / max_x, (y - lowest_y) / (max_y - lowest_y) if force_positive else y / max_y, index))
 
-    def map_scaled_distance(
-        self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]
-    ) -> None:
+    def map_scaled_distance(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         max_distance = self.get_max_distance()
-        self.map_distance(
-            lambda distance, index: callback(distance / max_distance, index)
-        )
+        self.map_distance(lambda distance, index: callback(
+            distance / max_distance, index))
 
-    def map_angle(
-        self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]
-    ) -> None:
+    def map_angle(self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]) -> None:
         """Maps LEDs based on their angle from center (0,0) in radians.
         Angle 0 points right (positive x-axis), increases counter-clockwise."""
-
-        def coordinate_callback(
-            x: float, y: float, index: Tuple[int, int]
-        ) -> Union[RGBW, None]:
+        def coordinate_callback(x: float, y: float, index: Tuple[int, int]) -> Union[RGBW, None]:
             angle = math.atan2(y, x)
             # Ensure angle is positive (0 to 2π instead of -π to π)
             if angle < 0:
@@ -171,14 +138,7 @@ class ControllerBase(ABC):
             for i in range(strip.numPixels()):
                 pixel = strip.getPixelColorRGBW(i)
                 strip_pixels.append(
-                    {
-                        "r": pixel.r,
-                        "g": pixel.g,
-                        "b": pixel.b,
-                        "w": pixel.w,
-                        "brightness": strip.getBrightness(),
-                    }
-                )
+                    {'r': pixel.r, 'g': pixel.g, 'b': pixel.b, 'w': pixel.w, 'brightness': strip.getBrightness()})
             pixels.append(strip_pixels)
         return pixels
 

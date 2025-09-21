@@ -1,5 +1,4 @@
 """Base class for LED effects"""
-
 import random
 from abc import ABC, abstractmethod
 from typing import Any, Literal
@@ -23,7 +22,7 @@ class ColorInterpolationParameters(ABC):
         self.interpolation = EnumParameter(
             default="linear",
             description="Color interpolation of the effect",
-            enum_values=["linear", "hsv"],
+            enum_values=["linear", "hsv"]
         )
 
 
@@ -33,7 +32,7 @@ class SpeedWithDirectionParameters(SpeedParameters, ABC):
         self.direction = EnumParameter(
             default="out",
             description="Direction of the effect",
-            enum_values=["in", "out"],
+            enum_values=["in", "out"]
         )
 
 
@@ -48,14 +47,11 @@ class ColorMigration:
         self.random_offset = random.uniform(0, 0.5)
         self.base_offset = time_offset
 
-    def run_iteration(
-        self, value: float, interpolation: Literal["linear", "hsv"]
-    ) -> RGBW:
+    def run_iteration(self, value: float, interpolation: Literal["linear", "hsv"]) -> RGBW:
         time_offset_base = self.base_offset + self.random_offset
         relative_time_offset = value - time_offset_base
         color = Effect.interpolate_color(
-            self.from_color, self.to_color, relative_time_offset, interpolation
-        )
+            self.from_color, self.to_color, relative_time_offset, interpolation)
         if relative_time_offset >= 1:
             self.re_init(value)
         return color
@@ -63,7 +59,6 @@ class ColorMigration:
 
 class Effect(ABC):
     """Base class for LED effects"""
-
     PARAMETERS: Any
 
     def __init__(self, controller: ControllerBase):
@@ -73,14 +68,14 @@ class Effect(ABC):
         """Returns a human-readable name for the effect by converting the class name from camel case."""
         name = self.__class__.__name__
         # Remove 'Effect' suffix if present
-        if name.endswith("Effect"):
-            name = name[: -len("Effect")]
+        if name.endswith('Effect'):
+            name = name[:-len('Effect')]
 
         # Insert spaces before capital letters and capitalize only the first letter
-        result = ""
+        result = ''
         for i, char in enumerate(name):
             if char.isupper() and i > 0:
-                result += " "
+                result += ' '
             result += char
 
         return result
@@ -123,9 +118,7 @@ class Effect(ABC):
         return RGBW.from_hsv(h, s, v, w)
 
     @staticmethod
-    def __interpolate_color_linear(
-        from_color: RGBW, to_color: RGBW, value: float
-    ) -> RGBW:
+    def __interpolate_color_linear(from_color: RGBW, to_color: RGBW, value: float) -> RGBW:
         """
         Interpolate between two colors using linear RGB interpolation for pastel transitions
         Args:
@@ -150,31 +143,23 @@ class Effect(ABC):
         return RGBW(r, g, b, w)
 
     @staticmethod
-    def interpolate_color(
-        from_color: RGBW,
-        to_color: RGBW,
-        value: float,
-        interpolation: Literal["linear", "hsv"],
-    ) -> RGBW:
+    def interpolate_color(from_color: RGBW, to_color: RGBW, value: float, interpolation: Literal["linear", "hsv"]) -> RGBW:
         if interpolation == "hsv":
             return Effect.__interpolate_color_hsv(from_color, to_color, value)
         return Effect.__interpolate_color_linear(from_color, to_color, value)
 
     @staticmethod
-    def time_offset(
-        ms: int, speed: float, direction: str = "in", mod: bool = True
-    ) -> float:
+    def time_offset(ms: int, speed: float, direction: str = 'in', mod: bool = True) -> float:
         min_sensitivity = 100  # Repeat every 100ms
         max_sensitivity = 1000 * 60 * 5  # Repeat every 5 minutes
         # Use exponential scaling to make sensitivity feel more natural
-        actual_sensitivity = min_sensitivity * pow(
-            max_sensitivity / min_sensitivity, 1 - speed
-        )
+        actual_sensitivity = min_sensitivity * \
+            pow(max_sensitivity/min_sensitivity, 1 - speed)
         if mod:
             offset = (ms % actual_sensitivity) / actual_sensitivity
         else:
             offset = ms / actual_sensitivity
-        if direction == "out":
+        if direction == 'out':
             return -offset
         return offset
 

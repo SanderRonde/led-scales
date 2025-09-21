@@ -29,5 +29,6 @@ def get_effects(controller: ControllerBase) -> Dict[str, Effect]:
         effects[RainbowEffect.__name__] = RainbowEffect(controller)
     if isinstance(controller, HexPanelLEDController):
         effects[RainbowSpinEffect.__name__] = RainbowSpinEffect(controller)
-        effects[RandomColorHexEffect.__name__] = RandomColorHexEffect(controller)
+        effects[RandomColorHexEffect.__name__] = RandomColorHexEffect(
+            controller)
     return effects
