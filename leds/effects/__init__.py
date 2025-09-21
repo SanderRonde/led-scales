@@ -7,6 +7,7 @@ from leds.effects.rainbow_spin import RainbowSpinEffect
 from leds.effects.random_color_single import RandomColorSingleEffect
 from leds.effects.random_color_hex import RandomColorHexEffect
 from leds.effects.random_color_dual import RandomColorDualEffect
+from leds.effects.setup_mode import SetupModeEffect
 from leds.controllers.controller_base import ControllerBase
 from leds.effects.effect import Effect
 from leds.controllers.scale_panel_controller import ScalePanelLEDController
@@ -22,6 +23,7 @@ def get_effects(controller: ControllerBase) -> Dict[str, Effect]:
         RandomColorSingleEffect.__name__: RandomColorSingleEffect(controller),
         RandomColorDualEffect.__name__: RandomColorDualEffect(controller),
         SingleColorEffect.__name__: SingleColorEffect(controller),
+        SetupModeEffect.__name__: SetupModeEffect(controller),
     }
     if isinstance(controller, ScalePanelLEDController):
         effects[RainbowEffect.__name__] = RainbowEffect(controller)

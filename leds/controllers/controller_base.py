@@ -122,6 +122,15 @@ class ControllerBase(ABC):
             for i in range(strip.numPixels()):
                 strip.setPixelColor(i, color)
 
+    def set_pixel_color(self, strip_index: int, pixel_index: int, color: RGBW) -> None:
+        """Set the color of a specific pixel across all strips"""
+        strip = self.get_strips()[strip_index]
+        strip.setPixelColor(pixel_index, color)
+
+    def get_led_count(self) -> int:
+        """Get the total number of LEDs across all strips"""
+        return sum(strip.numPixels() for strip in self.get_strips())
+
     def json(self) -> List[List[Dict[str, int]]]:
         pixels: List[List[Dict[str, int]]] = []
         for strip in self.get_strips():
