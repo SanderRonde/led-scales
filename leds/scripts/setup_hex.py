@@ -22,6 +22,7 @@ def main():
 
     led_indices: Dict[int, List[int]] = {}
     current_led = 0
+    last_user_index = 0
 
     try:
         while True:
@@ -32,19 +33,18 @@ def main():
             # Blink the current LED
             strip.setPixelColor(current_led, RGBW(255, 255, 255, 0))
             strip.show()
-            time.sleep(0.1)
-            strip.setPixelColor(current_led, RGBW(0, 0, 0, 0))
-            strip.show()
-            time.sleep(0.1)
 
             # Get user input
             user_input = input(f"Hex for pixel {current_led}: ")
             if user_input.isdigit():
                 user_num = int(user_input)
-                if user_num not in led_indices:
-                    led_indices[user_num] = []
-                led_indices[user_num].append(current_led)
-                current_led += 1
+            else:
+                user_num = last_user_index
+            last_user_index = user_num
+            if user_num not in led_indices:
+                led_indices[user_num] = []
+            led_indices[user_num].append(current_led)
+            current_led += 1
 
     except KeyboardInterrupt:
         # Dump the array in the format of HexConfig
