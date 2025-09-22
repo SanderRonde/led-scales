@@ -32,21 +32,18 @@ class HexPanel:
         # Calculate what fraction of the circle this index represents
         fraction = index / total_leds
 
-        # Convert to degrees (starting from top, moving clockwise)
-        # Multiply by 360 for full circle, subtract from 270 to start at top
-        # Then take modulo 360 to ensure we stay in the 0-359 range
-        return (270 - (fraction * 360)) % 360
+        # Convert to degrees
+        return ((-fraction * 360) + 360 + 180) % 360
 
     def get_x_y_at_index(self, index: int) -> Tuple[float, float]:
         angle = self.get_angle_at_index(index)
-        return round((HEX_SIZE * 0.9) * -math.sin(math.radians(angle))), round(
+        return round((HEX_SIZE * 0.9) * math.sin(math.radians(angle))), round(
             (HEX_SIZE * 0.9) * math.cos(math.radians(angle))
         )
 
     def set_color(self, color: RGBW):
         for index in self.panel_config.ordered_leds:
             self.strip.setPixelColor(index, color)
-
 
 class HexPanelLEDController(ControllerBase):
     def __init__(self, config: "HexConfig", mock: bool):
@@ -62,13 +59,12 @@ class HexPanelLEDController(ControllerBase):
         ]
         self.max_x = 0
         self.max_y = 0
+        self.cached_coordinates = []  # Cache for pre-calculated coordinates
         for panel in self.panels:
             self.max_x = max(self.max_x, (panel.panel_config.x + 1) * HEX_SIZE)
             self.max_y = max(self.max_y, (panel.panel_config.y + 1) * HEX_SIZE)
 
-    def map_coordinates(
-        self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]
-    ) -> None:
+        # Pre-calculate and cache coordinates
         total_center_x = self.max_x / 2
         total_center_y = self.max_y / 2
 
@@ -76,16 +72,23 @@ class HexPanelLEDController(ControllerBase):
             center_x = panel.get_center_x()
             center_y = panel.get_center_y()
 
-            led_index = 0
-            for led_index in panel.panel_config.ordered_leds:
+            panel_cache = []
+            for led_index in range(len(panel.panel_config.ordered_leds)):
                 relative_x, relative_y = panel.get_x_y_at_index(led_index)
-                color = callback(
-                    center_x + relative_x - total_center_x,
-                    center_y + relative_y - total_center_y,
-                    (panel_index, led_index),
-                )
+                absolute_x = center_x + relative_x - total_center_x
+                absolute_y = center_y + relative_y - total_center_y
+                panel_cache.append((absolute_x, absolute_y, (panel_index, panel.panel_config.ordered_leds[led_index])))
+            self.cached_coordinates.append(panel_cache)
+
+    def map_coordinates(
+        self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]
+    ) -> None:
+        for panel_cache in self.cached_coordinates:
+            for absolute_x, absolute_y, indices in panel_cache:
+                color = callback(absolute_x, absolute_y, indices)
                 if color is not None:
-                    panel.strip.setPixelColor(led_index, color)
+                    panel_index, led_index = indices
+                    self.panels[panel_index].strip.setPixelColor(led_index, color)
 
     def get_strips(self) -> List["MockPixelStrip"]:
         return list({panel.strip for panel in self.panels})

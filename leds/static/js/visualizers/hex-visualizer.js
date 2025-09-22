@@ -67,8 +67,8 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
             i++
         ) {
             const angle =
-                (i * Math.PI * 2) /
-                this.config.hexagons[hexIndex].ordered_leds.length;
+                ((this.config.hexagons[hexIndex].ordered_leds.length - i) * Math.PI * 2) /
+                this.config.hexagons[hexIndex].ordered_leds.length + (Math.PI / 2);
             const ledRadius = (this.config.hex_size / 2) * 0.8;
             const pointX = x + Math.cos(angle) * ledRadius * scale;
             const pointY = y + Math.sin(angle) * ledRadius * scale;
