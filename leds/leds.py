@@ -32,9 +32,10 @@ SLEEP_TIME_REAL = 0.01
 
 
 class LEDs:
-    def __init__(self, mock: bool, config: BaseConfig):
+    def __init__(self, mock: bool, config: BaseConfig, debug: bool = False):
         self._app = Flask(__name__, static_folder=None)
         self.config = config
+        self._debug = debug
         self._socketio = SocketIO(self._app, cors_allowed_origins="*")
         # Disable Flask request logging
         log = logging.getLogger("werkzeug")
@@ -43,6 +44,11 @@ class LEDs:
         self._init_routes()
         self._effects = get_effects(self._controller)
         self._running = False
+        
+        # FPS tracking variables
+        self._frame_count = 0
+        self._last_fps_time = time.time()
+        self._fps = 0.0
 
         # Load all configuration from a single file
         self._config_data = self._load_config()
@@ -318,6 +324,20 @@ class LEDs:
                 self._socketio.emit(  # type: ignore
                     "led_update", self._controller.json(), namespace="/"
                 )
+                
+                # FPS tracking and debug output
+                if self._debug:
+                    self._frame_count += 1
+                    current_time = time.time()
+                    time_diff = current_time - self._last_fps_time
+                    
+                    # Print FPS every 1 second
+                    if time_diff >= 1.0:
+                        self._fps = self._frame_count / time_diff
+                        print(f"FPS: {self._fps:.2f}", flush=True)
+                        self._frame_count = 0
+                        self._last_fps_time = current_time
+                
                 time.sleep(self._get_sleep_time())
 
         effect_thread = threading.Thread(target=run_effect, daemon=True)
@@ -326,8 +346,9 @@ class LEDs:
 
 def main() -> None:
     mock = "--mock" in sys.argv
+    debug = "--debug" in sys.argv
 
-    leds = LEDs(mock, get_config())
+    leds = LEDs(mock, get_config(), debug)
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 

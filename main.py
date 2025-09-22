@@ -130,16 +130,23 @@ def generate_cad(mode: str = "") -> None:
     print("CAD generation complete! Files can be found in the cad/out directory")
 
 
-def run_leds(mock: bool = False) -> None:
+def run_leds(mock: bool = False, debug: bool = False) -> None:
     print("Setting up LED environment...")
     setup_venv("led")
 
     print("Running LED implementation...")
     activate_script = get_venv_activate("led")
+    flags = []
+    if mock:
+        flags.append("--mock")
+    if debug:
+        flags.append("--debug")
+    flags_str = " ".join(flags)
+    
     if sys.platform == "win32":
-        cmd = f'"{activate_script}" && leds {"--mock" if mock else ""}'
+        cmd = f'"{activate_script}" && leds {flags_str}'
     else:
-        cmd = f'. "{activate_script}" && leds {"--mock" if mock else ""}'
+        cmd = f'. "{activate_script}" && leds {flags_str}'
     run_command(cmd)
 
 
@@ -199,6 +206,8 @@ def print_help() -> None:
     print("  python main.py help     - Show this help message")
     print("  python main.py leds     - Run the LED implementation")
     print("  python main.py leds-mock - Run the LED implementation in mock mode")
+    print("  python main.py leds-debug - Run the LED implementation with debug output (FPS)")
+    print("  python main.py leds-mock-debug - Run the LED implementation in mock mode with debug output")
     print(
         "  python main.py dev      - Run the server in development mode with auto-reload"
     )
@@ -334,6 +343,10 @@ if __name__ == "__main__":
         run_leds()
     elif command == "leds-mock":
         run_leds(True)
+    elif command == "leds-debug":
+        run_leds(debug=True)
+    elif command == "leds-mock-debug":
+        run_leds(True, True)
     elif command == "dev":
         dev()  # New development mode with auto-reload
     elif command == "lint":
