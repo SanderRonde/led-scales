@@ -96,6 +96,16 @@ class LEDs:
         except (json.JSONDecodeError, KeyError):
             return {"power_state": True}
 
+    def _has_connected_clients(self) -> bool:
+        """Check if there are any active WebSocket connections"""
+        try:
+            # Get participants from the default namespace ('/')
+            participants = list(self._socketio.server.manager.get_participants('/', '/'))
+            return len(participants) > 0
+        except Exception:
+            # If there's any error checking connections, assume no connections
+            return False
+
     def _init_routes(self) -> None:
         @self._app.route("/")
         def home():  # type: ignore  # pylint: disable=unused-variable
@@ -320,10 +330,11 @@ class LEDs:
                     self._controller.set_color(RGBW(0, 0, 0, 0))
                     self._controller.show()
 
-                # Emit LED data through WebSocket
-                self._socketio.emit(  # type: ignore
-                    "led_update", self._controller.json(), namespace="/"
-                )
+                # Emit LED data through WebSocket only if there are connected clients
+                if self._has_connected_clients():
+                    self._socketio.emit(  # type: ignore
+                        "led_update", self._controller.json(), namespace="/"
+                    )
 
                 # FPS tracking and debug output
                 if self._debug:
