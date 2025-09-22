@@ -1,15 +1,14 @@
+from typing import List, Dict
 from config import HexConfig
 from leds.color import RGBW
-from typing import List, Dict
 from leds.controllers.controller_base import get_library
-import time
 
 
 def main():
     config = HexConfig()
     PixelStrip, _ = get_library(False)
     (pin, channel) = config.pins
-    
+
     strip = PixelStrip(
         num=10000,
         pin=pin,

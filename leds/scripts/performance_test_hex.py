@@ -1,13 +1,14 @@
+import time
 from config import HexConfig
 from leds.color import RGBW
-import time
 from leds.controllers.controller_base import get_library
+
 
 def main():
     config = HexConfig()
     PixelStrip, _ = get_library(False)
     (pin, channel) = config.pins
-    
+
     strip = PixelStrip(
         num=config.get_led_count(),
         pin=pin,
