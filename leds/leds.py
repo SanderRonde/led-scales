@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
 SLEEP_TIME_MOCK = 0.05
 # Is sleeping even needed?
-SLEEP_TIME_REAL = 0.01
+SLEEP_TIME_REAL = 0.005
 
 
 class LEDs:
