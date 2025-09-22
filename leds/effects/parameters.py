@@ -78,6 +78,9 @@ class ColorParameter(Parameter):
         """Set the value of the parameter"""
         self.value = Color(value["r"], value["g"], value["b"])
 
+    def json(self) -> Dict[str, Any]:
+        return {**super().json(), "value": self.value.to_dict()}
+
 
 class EnumParameter(Parameter):
     """Enum parameter"""
@@ -120,3 +123,14 @@ class ColorListParameter(Parameter):
     def set_value(self, value: List[Dict[str, int]]):
         """Set the value of the parameter"""
         self.value = [Color(color["r"], color["g"], color["b"]) for color in value]
+
+    def json(self) -> Dict[str, Any]:
+        """Override json method to properly serialize RGBW objects in the list"""
+        return {
+            "type": self.type.value,
+            "description": self.description,
+            "value": [
+                color.to_dict() if isinstance(color, RGBW) else color
+                for color in self.value
+            ],
+        }
