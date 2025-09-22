@@ -15,6 +15,7 @@ from flask import (  # pylint: disable=import-error
     send_from_directory,
     request,
 )
+from flask.json.provider import JSONProvider
 from flask_socketio import SocketIO  # pylint: disable=import-error
 from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
@@ -31,9 +32,31 @@ SLEEP_TIME_MOCK = 0.05
 SLEEP_TIME_REAL = 0.005
 
 
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that ensures RGBW objects are serialized using to_dict()"""
+    def default(self, o: Any) -> Any:
+        if isinstance(o, RGBW):
+            return o.to_dict()
+        return super().default(o)
+
+
+class CustomJSONProvider(JSONProvider):
+    """Custom JSON provider that uses our custom encoder for RGBW serialization"""
+    
+    def dumps(self, obj: Any, **kwargs: Any) -> str:
+        """Serialize data as JSON using our custom encoder"""
+        kwargs.setdefault('cls', CustomJSONEncoder)
+        return json.dumps(obj, **kwargs)
+    
+    def loads(self, s: Any, **kwargs: Any) -> Any:
+        """Deserialize JSON data"""
+        return json.loads(s, **kwargs)
+
+
 class LEDs:
     def __init__(self, mock: bool, config: BaseConfig, debug: bool = False):
         self._app = Flask(__name__, static_folder=None)
+        self._app.json = CustomJSONProvider(self._app)
         self.config = config
         self._debug = debug
         self._socketio = SocketIO(self._app, cors_allowed_origins="*")

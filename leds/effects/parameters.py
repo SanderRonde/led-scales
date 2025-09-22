@@ -43,9 +43,7 @@ class Parameter(ABC):
         return {
             "type": self.type.value,
             "description": self.description,
-            "value": (
-                self.value.to_dict() if isinstance(self.value, RGBW) else self.value
-            ),
+            "value": self.value,
         }
 
 
