@@ -73,11 +73,11 @@ class HexPanelLEDController(ControllerBase):
             center_y = panel.get_center_y()
 
             panel_cache = []
-            for led_index in range(len(panel.panel_config.ordered_leds)):
+            for led_index, led_number in enumerate(panel.panel_config.ordered_leds):
                 relative_x, relative_y = panel.get_x_y_at_index(led_index)
                 absolute_x = center_x + relative_x - total_center_x
                 absolute_y = center_y + relative_y - total_center_y
-                panel_cache.append((absolute_x, absolute_y, (panel_index, panel.panel_config.ordered_leds[led_index])))
+                panel_cache.append((absolute_x, absolute_y, (panel_index, led_number)))
             self.cached_coordinates.append(panel_cache)
 
     def map_coordinates(
