@@ -303,6 +303,7 @@ class LEDs:
             port=self.config.web_port,  # type: ignore
             debug=False,
             use_reloader=False,
+            allow_unsafe_werkzeug=True,
         )
 
     def set_effect(self, effect_name: str) -> Effect:
