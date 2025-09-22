@@ -1,8 +1,10 @@
 from typing import Optional, Union, List, Tuple, Any, Dict
 from pathlib import Path
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from functools import lru_cache
 from leds import controllers
+from leds.performance import profile_function, profile_block, get_profiler
 
 # Unless otherwise specified, all dimensions are in mm
 
@@ -15,13 +17,11 @@ class BaseConfig(ABC):
         pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScaleConfig(BaseConfig):
     web_port: int = 5001
     # A tuple of (pin, channel) per panel
-    pins: List[Tuple[int, int]] = field(
-        default_factory=lambda: [(13, 1), (19, 1), (26, 2)]
-    )
+    pins: Tuple[Tuple[int, int], ...] = ((13, 1), (19, 1), (26, 2))
 
     # Scale dimensions
     base_length: float = 25
@@ -65,14 +65,16 @@ class ScaleConfig(BaseConfig):
     # Debug
     is_fast: bool = False
 
+    @profile_function("ScaleConfig.validate")
     def validate(self):
-        # Adjust print bed dimensions
-        if len(self.pins) != self.panel_count:
-            raise ValueError(
-                f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})"
-            )
-        if self.panel_count % 2 != 1:
-            raise ValueError("Panel count must be an odd number")
+        with profile_block("ScaleConfig.validate.pin_check"):
+            # Adjust print bed dimensions
+            if len(self.pins) != self.panel_count:
+                raise ValueError(
+                    f"Number of pins ({len(self.pins)}) must match number of panels ({self.panel_count})"
+                )
+            if self.panel_count % 2 != 1:
+                raise ValueError("Panel count must be an odd number")
 
     @property
     def spike_height(self) -> float:
@@ -105,21 +107,26 @@ class ScaleConfig(BaseConfig):
         return self.panel_height
 
     @property
+    @lru_cache(maxsize=1)
     def scale_per_panel_count(self) -> int:
         return (self.x_count + self.x_count - 1) * self.y_count
 
+    @lru_cache(maxsize=1)
     def get_led_count(self) -> int:
         return self.scale_per_panel_count * self.panel_count
 
     @property
+    @lru_cache(maxsize=1)
     def total_weight_kg(self) -> float:
         return self.estimated_weight_g * self.get_led_count() / 1000
 
     @property
+    @lru_cache(maxsize=1)
     def total_price_eur(self) -> float:
         return self.total_weight_kg * self.price_per_kilo
 
     @property
+    @lru_cache(maxsize=1)
     def total_area_m2(self) -> float:
         return (self.panel_width * self.panel_height * self.panel_count) / 1000000
 
@@ -146,20 +153,24 @@ class HexConfig(BaseConfig):
             Hexagon(2, 2, [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]),
         ]
 
+    @profile_function("HexConfig.validate")
     def validate(self):
-        print("Post init")
-        for hexagon in self.hexagons:
-            if hexagon.x % 2 == 1:
-                if hexagon.y % 1 != 0.5:
-                    raise ValueError(
-                        f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected half-digit number"
-                    )
-            else:
-                if hexagon.y % 1 != 0:
-                    raise ValueError(
-                        f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected integer"
-                    )
-
+        get_profiler().logger.debug("Validating HexConfig")
+        
+        with profile_block("HexConfig.validate.coordinate_check"):
+            for hexagon in self.hexagons:
+                if hexagon.x % 2 == 1:
+                    if hexagon.y % 1 != 0.5:
+                        raise ValueError(
+                            f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected half-digit number"
+                        )
+                else:
+                    if hexagon.y % 1 != 0:
+                        raise ValueError(
+                            f"Hexagon {hexagon.x}, {hexagon.y} has y coordinate {hexagon.y}, expected integer"
+                        )
+        
+        with profile_block("HexConfig.validate.led_count_check"):
             max_led_index = 0
             for hexagon in self.hexagons:
                 max_led_index = max(max_led_index, *hexagon.ordered_leds)
@@ -167,7 +178,10 @@ class HexConfig(BaseConfig):
                 raise ValueError(
                     f"Hexagon has {max_led_index + 1} LEDs, expected {self.get_led_count()}"
                 )
+        
+        get_profiler().logger.debug(f"HexConfig validated: {len(self.hexagons)} hexagons, {self.get_led_count()} LEDs")
 
+    @lru_cache(maxsize=1)
     def get_led_count(self) -> int:
         return sum(len(hexagon.ordered_leds) for hexagon in self.hexagons)
 
@@ -178,17 +192,28 @@ class HexConfig(BaseConfig):
 # _config = HexConfig()
 _config = ScaleConfig()
 
-# Always validate the config
-_config.validate()
+# Always validate the config with performance monitoring
+with profile_block("config_validation"):
+    _config.validate()
+    get_profiler().logger.info(f"Configuration loaded and validated: {type(_config).__name__}")
 
 
 def get_config() -> BaseConfig:
     return _config
 
 
+@profile_function("get_led_controller")
 def get_led_controller(mock: bool) -> controllers.ControllerBase:
-    if isinstance(_config, ScaleConfig):  # type: ignore
-        return controllers.ScalePanelLEDController(_config, mock)
-    if isinstance(_config, HexConfig):  # type: ignore
-        return controllers.HexPanelLEDController(_config, mock)
-    raise ValueError(f"Unknown config type: {type(_config)}")
+    with profile_block("led_controller_creation"):
+        if isinstance(_config, ScaleConfig):  # type: ignore
+            controller = controllers.ScalePanelLEDController(_config, mock)
+        elif isinstance(_config, HexConfig):  # type: ignore
+            controller = controllers.HexPanelLEDController(_config, mock)
+        else:
+            raise ValueError(f"Unknown config type: {type(_config)}")
+        
+        get_profiler().logger.info(
+            f"LED controller created: {type(controller).__name__}, "
+            f"mock={mock}, LEDs={_config.get_led_count()}"
+        )
+        return controller

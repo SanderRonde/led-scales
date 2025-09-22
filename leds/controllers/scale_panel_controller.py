@@ -1,7 +1,9 @@
 from typing import Type, Any, List, Tuple, Callable, Union, TYPE_CHECKING
+from functools import lru_cache
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
 from leds.controllers.controller_base import ControllerBase
+from leds.performance import profile_function, profile_block
 
 if TYPE_CHECKING:
     from config import ScaleConfig
@@ -25,6 +27,10 @@ class LEDPanel:
         self.strip = ControllerBase.init_strip(
             PixelStrip, self.num_pixels, pin, channel
         )
+        
+        # Cache frequently used values
+        self._base_x = None
+        self._center_y = config.y_count / 2
 
     @property
     def distance_from_center(self) -> int:
@@ -33,14 +39,16 @@ class LEDPanel:
             return 0
         return self.index - center_panel
 
+    @lru_cache(maxsize=1)
     def get_base_x(self) -> float:
-        distance_from_center = self.distance_from_center
-        scale_offset = (
-            (distance_from_center - 0.5) * self.config.x_count
-            + (self.config.panel_spacing_scales * abs(distance_from_center))
-            + 0.5
-        )
-        return scale_offset
+        if self._base_x is None:
+            distance_from_center = self.distance_from_center
+            self._base_x = (
+                (distance_from_center - 0.5) * self.config.x_count
+                + (self.config.panel_spacing_scales * abs(distance_from_center))
+                + 0.5
+            )
+        return self._base_x
 
     def set_color(self, color: RGBW) -> None:
         for i in range(self.num_pixels):
@@ -48,45 +56,51 @@ class LEDPanel:
 
 
 class ScalePanelLEDController(ControllerBase):
+    @profile_function("ScalePanelLEDController.__init__")
     def __init__(self, config: "ScaleConfig", mock: bool, **kwargs: Any):
         super().__init__(mock)
         self.config = config
-        self.panels: List[LEDPanel] = [
-            LEDPanel(self.PixelStrip, config, index, **kwargs)
-            for index in range(config.panel_count)
-        ]
+        
+        with profile_block("ScalePanelLEDController.panels_creation"):
+            self.panels: List[LEDPanel] = [
+                LEDPanel(self.PixelStrip, config, index, **kwargs)
+                for index in range(config.panel_count)
+            ]
 
+    @profile_function("ScalePanelLEDController.map_coordinates")
     def map_coordinates(
         self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]
     ) -> None:
+        # Pre-calculate values to avoid repeated computation
+        x_count = self.config.x_count
+        y_count = self.config.y_count
+        
         for panel in self.panels:
             base_x = panel.get_base_x()
-            center_y = self.config.y_count / 2
+            center_y = panel._center_y  # Use cached value
             led_index = 0
-            y = 0
-            for x in range(self.config.x_count):
+            
+            for x in range(x_count):
                 # First go up from the bottom left
-                for y in range(self.config.y_count):
+                for y in range(y_count):
                     color = callback(
                         base_x + x, center_y - y - 1, (panel.index, led_index)
                     )
                     if color is not None:
                         panel.strip.setPixelColor(led_index, color)
                     led_index += 1
-                y += 1
 
-                if x != self.config.x_count - 1:
+                if x != x_count - 1:
                     # Then go down again
-                    for y in range(self.config.y_count):
+                    for y in range(y_count):
                         color = callback(
                             base_x + x + 0.5,
-                            center_y - (self.config.y_count - (y + 0.5)),
+                            center_y - (y_count - (y + 0.5)),
                             (panel.index, led_index),
                         )
                         if color is not None:
                             panel.strip.setPixelColor(led_index, color)
                         led_index += 1
-                    y += 1
 
     def get_strips(self) -> List["MockPixelStrip"]:
         return [panel.strip for panel in self.panels]

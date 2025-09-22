@@ -1,9 +1,10 @@
-from functools import cache
+from functools import cache, lru_cache
 from typing import Type, Any, Tuple, Callable, Union, List, Dict
 from abc import ABC, abstractmethod
 import math
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
+from leds.performance import profile_function, profile_block
 
 # Try to import the real library first
 try:
@@ -27,10 +28,15 @@ def get_library(mock: bool) -> Tuple[Type[Any], bool]:
 
 
 class ControllerBase(ABC):
+    @profile_function("ControllerBase.__init__")
     def __init__(self, mock: bool):
         PixelStrip, is_real = get_library(mock)
         self.is_mock = not is_real
         self.PixelStrip: Type[MockPixelStrip] = PixelStrip
+        
+        # Performance optimizations
+        self._brightness_cache = None
+        self._last_brightness = -1
 
     @staticmethod
     def init_strip(
@@ -89,6 +95,7 @@ class ControllerBase(ABC):
     ) -> None:
         pass
 
+    @profile_function("ControllerBase.map_distance")
     def map_distance(
         self, callback: Callable[[float, Tuple[int, int]], Union[RGBW, None]]
     ) -> None:
@@ -142,10 +149,19 @@ class ControllerBase(ABC):
     def get_strips(self) -> List[MockPixelStrip]:
         pass
 
+    @profile_function("ControllerBase.set_brightness")
     def set_brightness(self, brightness: float) -> None:
+        # Cache brightness to avoid unnecessary updates
+        if self._last_brightness == brightness:
+            return
+            
+        brightness_int = int(brightness * 255)
         for strip in self.get_strips():
-            strip.setBrightness(int(brightness * 255))
+            strip.setBrightness(brightness_int)
+        
+        self._last_brightness = brightness
 
+    @profile_function("ControllerBase.show")
     def show(self) -> None:
         for strip in self.get_strips():
             strip.show()
