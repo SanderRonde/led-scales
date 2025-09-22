@@ -88,7 +88,8 @@ class HexPanelLEDController(ControllerBase):
                     panel.strip.setPixelColor(led_index, color)
 
     def get_strips(self) -> List["MockPixelStrip"]:
-        return [panel.strip for panel in self.panels]
+        strips = [panel.strip for panel in self.panels]
+        return list(dict.fromkeys(strips))
 
     def get_visualizer_config(self) -> Any:
         return {
