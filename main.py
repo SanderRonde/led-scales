@@ -227,13 +227,13 @@ def dev() -> None:
 
     try:
         # Only import watchdog when needed
-        from watchdog.observers import (
+        from watchdog.observers import (   # pylint: disable=import-outside-toplevel
             Observer,
-        )  # pylint: disable=import-outside-toplevel
-        from watchdog.events import (
+        )
+        from watchdog.events import (   # pylint: disable=import-outside-toplevel
             FileSystemEventHandler,
             FileSystemEvent,
-        )  # pylint: disable=import-outside-toplevel
+        )
 
         class RestartHandler(FileSystemEventHandler):
             def __init__(self):

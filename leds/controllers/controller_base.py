@@ -53,8 +53,8 @@ class ControllerBase(ABC):
         highest = 0
 
         def distance_callback(
-            distance: float, index: Tuple[int, int]
-        ) -> None:  # pylint: disable=unused-argument
+            distance: float, index: Tuple[int, int] # pylint: disable=unused-argument
+        ) -> None:
             nonlocal highest
             highest = max(highest, distance)
 
@@ -69,8 +69,8 @@ class ControllerBase(ABC):
         lowest_y = 0
 
         def x_callback(
-            x: float, y: float, index: Tuple[int, int]
-        ) -> None:  # pylint: disable=unused-argument
+            x: float, y: float, index: Tuple[int, int] # pylint: disable=unused-argument
+        ) -> None:
             nonlocal highest_x
             nonlocal highest_y
             nonlocal lowest_x

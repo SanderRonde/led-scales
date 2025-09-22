@@ -8,13 +8,13 @@ import logging
 import json
 from typing import Dict, Any, Union
 from pathlib import Path
-from flask import (
+from flask import (  # pylint: disable=import-error
     Flask,
     render_template,
     jsonify,
     send_from_directory,
     request,
-)  # pylint: disable=import-error
+)
 from flask_socketio import SocketIO  # pylint: disable=import-error
 from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
@@ -44,7 +44,7 @@ class LEDs:
         self._init_routes()
         self._effects = get_effects(self._controller)
         self._running = False
-        
+
         # FPS tracking variables
         self._frame_count = 0
         self._last_fps_time = time.time()
@@ -324,20 +324,20 @@ class LEDs:
                 self._socketio.emit(  # type: ignore
                     "led_update", self._controller.json(), namespace="/"
                 )
-                
+
                 # FPS tracking and debug output
                 if self._debug:
                     self._frame_count += 1
                     current_time = time.time()
                     time_diff = current_time - self._last_fps_time
-                    
+
                     # Print FPS every 1 second
                     if time_diff >= 1.0:
                         self._fps = self._frame_count / time_diff
                         print(f"FPS: {self._fps:.2f}", flush=True)
                         self._frame_count = 0
                         self._last_fps_time = current_time
-                
+
                 time.sleep(self._get_sleep_time())
 
         effect_thread = threading.Thread(target=run_effect, daemon=True)
