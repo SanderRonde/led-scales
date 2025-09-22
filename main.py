@@ -195,6 +195,17 @@ def format_code() -> None:
     run_command(cmd)
 
 
+def configure_led_order() -> None:
+    """Run the LED order configuration tool"""
+    print("Setting up LED environment...")
+    setup_venv("led")
+
+    print("Running LED order configuration tool...")
+    python_exe = get_venv_python("led")
+    cmd = f'"{python_exe}" leds/scripts/configure_led_order.py'
+    run_command(cmd)
+
+
 def print_help() -> None:
     print("LED Scales CAD Generator:")
     print("  python main.py setup    - Set up both development environments")
@@ -213,6 +224,7 @@ def print_help() -> None:
     )
     print("  python main.py lint     - Run pylint on the codebase")
     print("  python main.py format   - Format the codebase using Black")
+    print("  python main.py configure-leds - Configure LED ordering for hexagon layout")
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -353,6 +365,8 @@ if __name__ == "__main__":
         lint()  # New lint command
     elif command == "format":
         format_code()  # New format command
+    elif command == "configure-leds":
+        configure_led_order()  # New LED configuration command
     elif command == "all":
         print("Generating 3D print files...")
         generate_cad("--3d")
