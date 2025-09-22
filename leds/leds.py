@@ -96,16 +96,6 @@ class LEDs:
         except (json.JSONDecodeError, KeyError):
             return {"power_state": True}
 
-    def _has_connected_clients(self) -> bool:
-        """Check if there are any active WebSocket connections"""
-        try:
-            # Get participants from the default namespace ('/')
-            participants = list(self._socketio.server.manager.get_participants('/', '/'))
-            return len(participants) > 0
-        except Exception:
-            # If there's any error checking connections, assume no connections
-            return False
-
     def _init_routes(self) -> None:
         @self._app.route("/")
         def home():  # type: ignore  # pylint: disable=unused-variable
@@ -280,7 +270,7 @@ class LEDs:
 
     def listen(self) -> None:
         """Start the web server in the main thread"""
-        print(f"LEDs web server running on http://0.0.0.0:{self.config.web_port}")
+        print(f"LEDs web server running, visit http://localhost:{self.config.web_port} to view the visualizer")
         self._socketio.run(
             self._app,
             host="0.0.0.0",
@@ -330,8 +320,8 @@ class LEDs:
                     self._controller.set_color(RGBW(0, 0, 0, 0))
                     self._controller.show()
 
-                # Emit LED data through WebSocket only if there are connected clients
-                if self._has_connected_clients():
+                # Emit LED data through WebSocket
+                if self._controller.is_mock:
                     self._socketio.emit(  # type: ignore
                         "led_update", self._controller.json(), namespace="/"
                     )
