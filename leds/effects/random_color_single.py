@@ -2,13 +2,12 @@ from leds.effects.effect import (
     Effect,
     SpeedWithDirectionParameters,
     ColorMigration,
-    ColorInterpolationParameters,
 )
 from leds.controllers.controller_base import ControllerBase
 
 
 class RandomColorSingleParameters(
-    SpeedWithDirectionParameters, ColorInterpolationParameters
+    SpeedWithDirectionParameters
 ):
     pass
 
