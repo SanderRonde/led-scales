@@ -8,7 +8,7 @@ from leds import controllers
 
 
 class BaseConfig(ABC):
-    web_port: int = 5002
+    web_port: int = 5001
     # Show X and Y coordinates of the LEDs in the visualizer
     debug_positions: bool = False
 
@@ -19,7 +19,7 @@ class BaseConfig(ABC):
 
 @dataclass
 class ScaleConfig(BaseConfig):
-    web_port: int = 5002
+    web_port: int = 5001
     # A tuple of (pin, channel) per panel
     pins: List[Tuple[int, int]] = field(
         default_factory=lambda: [(13, 1), (19, 1), (26, 2)]
