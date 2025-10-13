@@ -48,9 +48,9 @@ class LEDOrderConfigurator:
 
         # Colors for identifying LEDs in each hexagon
         self.colors = [
-            RGBW(255, 0, 0, 0),    # Red
-            RGBW(0, 255, 0, 0),    # Green
-            RGBW(0, 0, 255, 0),    # Blue
+            RGBW(255, 0, 0, 0),  # Red
+            RGBW(0, 255, 0, 0),  # Green
+            RGBW(0, 0, 255, 0),  # Blue
             RGBW(255, 255, 0, 0),  # Yellow
             RGBW(255, 0, 255, 0),  # Magenta
             RGBW(0, 255, 255, 0),  # Cyan
@@ -98,11 +98,24 @@ class LEDOrderConfigurator:
             for i, led_id in enumerate(leds):
                 color = self.colors[i % len(self.colors)]
                 self.strip.setPixelColor(led_id, color)
-                color_name = ['Red', 'Green', 'Blue', 'Yellow', 'Magenta', 'Cyan', 'Orange', 'Purple'][i % 8]
-                print(f"  Position {i}: {self.color_codes[i % len(self.color_codes)]}{color_name}\033[0m")
+                color_name = [
+                    "Red",
+                    "Green",
+                    "Blue",
+                    "Yellow",
+                    "Magenta",
+                    "Cyan",
+                    "Orange",
+                    "Purple",
+                ][i % 8]
+                print(
+                    f"  Position {i}: {self.color_codes[i % len(self.color_codes)]}{color_name}\033[0m"
+                )
             self.strip.show()
-            
-            group_input = input(f"Which color (1-{total_leds}) contains the bottom LED? ").strip()
+
+            group_input = input(
+                f"Which color (1-{total_leds}) contains the bottom LED? "
+            ).strip()
             if not group_input.isdigit():
                 print("Please enter a color number")
                 return self.identify_led_by_subdivision(leds)
@@ -118,19 +131,32 @@ class LEDOrderConfigurator:
 
             groups = []
             for i in range(0, total_leds, group_size):
-                group = leds[i:i + group_size]
+                group = leds[i : i + group_size]
                 groups.append(group)
                 color = self.colors[len(groups) - 1]
-                color_name = ['Red', 'Green', 'Blue', 'Yellow', 'Magenta', 'Cyan', 'Orange', 'Purple'][len(groups) - 1]
+                color_name = [
+                    "Red",
+                    "Green",
+                    "Blue",
+                    "Yellow",
+                    "Magenta",
+                    "Cyan",
+                    "Orange",
+                    "Purple",
+                ][len(groups) - 1]
 
-                print(f"  Group {len(groups)}: Positions {i}-{min(i + group_size - 1, total_leds - 1)} = {self.color_codes[len(groups) - 1]}{color_name}\033[0m")
+                print(
+                    f"  Group {len(groups)}: Positions {i}-{min(i + group_size - 1, total_leds - 1)} = {self.color_codes[len(groups) - 1]}{color_name}\033[0m"
+                )
 
                 for led_id in group:
                     self.strip.setPixelColor(led_id, color)
 
             self.strip.show()
 
-            group_input = input(f"Which group (1-{len(groups)}) contains the bottom LED? ").strip()
+            group_input = input(
+                f"Which group (1-{len(groups)}) contains the bottom LED? "
+            ).strip()
             if group_input.isdigit():
                 group_num = int(group_input)
                 if 1 <= group_num <= len(groups):
@@ -159,7 +185,9 @@ class LEDOrderConfigurator:
             # Small group - let user pick directly
             while True:
                 try:
-                    pos_input = input(f"Which position (0-{len(leds)-1}) is the bottom LED? ").strip()
+                    pos_input = input(
+                        f"Which position (0-{len(leds)-1}) is the bottom LED? "
+                    ).strip()
                     if pos_input.isdigit():
                         pos = int(pos_input)
                         if 0 <= pos < len(leds):
@@ -190,26 +218,30 @@ class LEDOrderConfigurator:
                 user_input = input("Choose action: ").strip().lower()
                 print(f"User input: {user_input}")
 
-                if user_input in ['ok', 'o']:
+                if user_input in ["ok", "o"]:
                     print("LED order confirmed!")
                     return leds
-                elif user_input in ['skip', 's']:
+                elif user_input in ["skip", "s"]:
                     print("Keeping original LED order")
                     return hexagon.ordered_leds
-                elif user_input in ['test', 't']:
+                elif user_input in ["test", "t"]:
                     self.test_rainbow_hexagon(leds)
                     input("Press Enter to continue configuration...")
                     continue
-                elif user_input in ['identify', 'i']:
+                elif user_input in ["identify", "i"]:
                     bottom_pos = self.show_hexagon_leds(hex_index)
                     if 0 <= bottom_pos < len(leds):
                         # Shift the array so the bottom LED is first
                         leds = leds[bottom_pos:] + leds[:bottom_pos]
-                        print(f"\nShifted array to put LED at position {bottom_pos} first")
+                        print(
+                            f"\nShifted array to put LED at position {bottom_pos} first"
+                        )
                         print("New ordering: bottom LED is now at position 0")
 
                         # Show test
-                        print("Showing test rainbow with new ordering, should following ordering starting from bottom and going counter-clockwise:")
+                        print(
+                            "Showing test rainbow with new ordering, should following ordering starting from bottom and going counter-clockwise:"
+                        )
                         print(f"  {self.color_codes[0]}Red\033[0m")
                         print(f"  {self.color_codes[6]}Orange\033[0m")
                         print(f"  {self.color_codes[3]}Yellow\033[0m")
@@ -298,19 +330,24 @@ class LEDOrderConfigurator:
         print()
 
         if not self.is_real:
-            print("WARNING: Using mock LED implementation. Connect to real hardware for actual configuration.")
+            print(
+                "WARNING: Using mock LED implementation. Connect to real hardware for actual configuration."
+            )
             print()
 
         try:
             for hex_index, hexagon in enumerate(self.config.hexagons):
                 print(f"\n{'='*50}")
-                print(f"Configuring Hexagon {hex_index + 1}/{len(self.config.hexagons)}")
+                print(
+                    f"Configuring Hexagon {hex_index + 1}/{len(self.config.hexagons)}"
+                )
                 print(f"Position: ({hexagon.x}, {hexagon.y})")
 
                 new_leds = self.configure_hexagon(hex_index)
 
                 # Create new hexagon with updated LED order
                 from config import Hexagon
+
                 new_hex = Hexagon(hexagon.x, hexagon.y, new_leds)
                 self.new_hexagons.append(new_hex)
 
@@ -346,7 +383,9 @@ class LEDOrderConfigurator:
 
         print("]")
         print()
-        print("Copy this code into your config.py file in the HexConfig.__init__() method")
+        print(
+            "Copy this code into your config.py file in the HexConfig.__init__() method"
+        )
 
 
 def main():

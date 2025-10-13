@@ -142,7 +142,7 @@ def run_leds(mock: bool = False, debug: bool = False) -> None:
     if debug:
         flags.append("--debug")
     flags_str = " ".join(flags)
-    
+
     if sys.platform == "win32":
         cmd = f'"{activate_script}" && leds {flags_str}'
     else:
@@ -217,8 +217,12 @@ def print_help() -> None:
     print("  python main.py help     - Show this help message")
     print("  python main.py leds     - Run the LED implementation")
     print("  python main.py leds-mock - Run the LED implementation in mock mode")
-    print("  python main.py leds-debug - Run the LED implementation with debug output (FPS)")
-    print("  python main.py leds-mock-debug - Run the LED implementation in mock mode with debug output")
+    print(
+        "  python main.py leds-debug - Run the LED implementation with debug output (FPS)"
+    )
+    print(
+        "  python main.py leds-mock-debug - Run the LED implementation in mock mode with debug output"
+    )
     print(
         "  python main.py dev      - Run the server in development mode with auto-reload"
     )
@@ -239,10 +243,10 @@ def dev() -> None:
 
     try:
         # Only import watchdog when needed
-        from watchdog.observers import (   # pylint: disable=import-outside-toplevel
+        from watchdog.observers import (  # pylint: disable=import-outside-toplevel
             Observer,
         )
-        from watchdog.events import (   # pylint: disable=import-outside-toplevel
+        from watchdog.events import (  # pylint: disable=import-outside-toplevel
             FileSystemEventHandler,
             FileSystemEvent,
         )
