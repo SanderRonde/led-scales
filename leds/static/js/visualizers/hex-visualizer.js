@@ -67,8 +67,11 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
             i++
         ) {
             const angle =
-                ((this.config.hexagons[hexIndex].ordered_leds.length - i) * Math.PI * 2) /
-                this.config.hexagons[hexIndex].ordered_leds.length + (Math.PI / 2);
+                ((this.config.hexagons[hexIndex].ordered_leds.length - i) *
+                    Math.PI *
+                    2) /
+                    this.config.hexagons[hexIndex].ordered_leds.length +
+                Math.PI / 2;
             const ledRadius = (this.config.hex_size / 2) * 0.8;
             const pointX = x + Math.cos(angle) * ledRadius * scale;
             const pointY = y + Math.sin(angle) * ledRadius * scale;
@@ -84,12 +87,27 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
             const ledIndex = this.config.hexagons[hexIndex].ordered_leds[i];
             // Apply brightness to RGB values
             const brightness = pixelStrips[0][ledIndex].brightness / 255; // Default to 1.0 if not provided
-            this.ctx.fillStyle = `rgb(${
-                pixelStrips[0][ledIndex].r * brightness
-            }, ${pixelStrips[0][ledIndex].g * brightness}, ${
-                pixelStrips[0][ledIndex].b * brightness
-            })`;
-            this.ctx.fill();
+            if (
+                pixelStrips[0][ledIndex].x !== undefined &&
+                pixelStrips[0][ledIndex].y !== undefined
+            ) {
+                this.ctx.font = "6px Arial";
+                this.ctx.fillStyle = "white";
+                this.ctx.fillText(
+                    `(${pixelStrips[0][ledIndex].x.toFixed(
+                        1
+                    )}, ${pixelStrips[0][ledIndex].y.toFixed(1)})`,
+                    pointX,
+                    pointY
+                );
+            } else {
+                this.ctx.fillStyle = `rgb(${
+                    pixelStrips[0][ledIndex].r * brightness
+                }, ${pixelStrips[0][ledIndex].g * brightness}, ${
+                    pixelStrips[0][ledIndex].b * brightness
+                })`;
+                this.ctx.fill();
+            }
         }
         this.ctx.restore();
     }
@@ -106,10 +124,10 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
             hexIndex++
         ) {
             const hexagon = this.config.hexagons[hexIndex];
-            const centerX = (hexagon.x + 0.5) * this.config.hex_size * scale;
+            const hexSize = this.config.hex_size * scale;
+            const centerX = (hexagon.x + 0.5) * hexSize * 0.8 + 0.1 * hexSize;
             const centerY =
-                this.canvas.height -
-                (hexagon.y + 0.5) * this.config.hex_size * scale;
+                this.canvas.height - (hexagon.y + 0.5) * hexSize * 0.9;
 
             // Draw a simple hexagon for now
             this.drawHexagon(centerX, centerY, hexIndex, pixelStrips, scale);
@@ -118,7 +136,7 @@ export class HexLEDVisualizer extends LEDVisualizerBase {
 
     getDimensions() {
         return {
-            width: this.config.max_x,
+            width: this.config.max_x * 1.05,
             height: this.config.max_y,
         };
     }

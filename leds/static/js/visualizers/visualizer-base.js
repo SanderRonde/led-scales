@@ -5,6 +5,8 @@
  * @property {number} b - Blue value
  * @property {number} w - White value
  * @property {number} brightness - Brightness value [0-255]
+ * @property {number} [x] - X coordinate (only present if debug_positions is enabled)
+ * @property {number} [y] - Y coordinate (only present if debug_positions is enabled)
  */
 
 /**

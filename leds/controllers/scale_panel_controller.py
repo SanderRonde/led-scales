@@ -49,17 +49,15 @@ class LEDPanel:
 
 class ScalePanelLEDController(ControllerBase):
     def __init__(self, config: "ScaleConfig", mock: bool, **kwargs: Any):
-        super().__init__(mock)
+        super().__init__(config, mock)
         self.config = config
         self.panels: List[LEDPanel] = [
             LEDPanel(self.PixelStrip, config, index, **kwargs)
             for index in range(config.panel_count)
         ]
-
-    def map_coordinates(
-        self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]
-    ) -> None:
+        self.cached_coordinates: List[List[Tuple[float, float, Tuple[int, int]]]] = []
         for panel in self.panels:
+            panel_cache: List[Tuple[float, float, Tuple[int, int]]] = []
             base_x = panel.get_base_x()
             center_y = self.config.y_count / 2
             led_index = 0
@@ -67,26 +65,38 @@ class ScalePanelLEDController(ControllerBase):
             for x in range(self.config.x_count):
                 # First go up from the bottom left
                 for y in range(self.config.y_count):
-                    color = callback(
-                        base_x + x, center_y - y - 1, (panel.index, led_index)
+                    panel_cache.append(
+                        (base_x + x, center_y - y - 1, (panel.index, led_index))
                     )
-                    if color is not None:
-                        panel.strip.setPixelColor(led_index, color)
                     led_index += 1
                 y += 1
 
                 if x != self.config.x_count - 1:
                     # Then go down again
                     for y in range(self.config.y_count):
-                        color = callback(
-                            base_x + x + 0.5,
-                            center_y - (self.config.y_count - (y + 0.5)),
-                            (panel.index, led_index),
+                        panel_cache.append(
+                            (
+                                base_x + x + 0.5,
+                                center_y - (self.config.y_count - (y + 0.5)),
+                                (panel.index, led_index),
+                            )
                         )
-                        if color is not None:
-                            panel.strip.setPixelColor(led_index, color)
                         led_index += 1
                     y += 1
+            self.cached_coordinates.append(panel_cache)
+
+    def map_coordinates(
+        self, callback: Callable[[float, float, Tuple[int, int]], Union[RGBW, None]]
+    ) -> None:
+        for panel_cache in self.cached_coordinates:
+            for absolute_x, absolute_y, indices in panel_cache:
+                color = callback(absolute_x, absolute_y, indices)
+                if color is not None:
+                    panel_index, led_index = indices
+                    self.panels[panel_index].strip.setPixelColor(led_index, color)
+
+    def get_coordinates(self, strip_index: int, led_index: int) -> Tuple[float, float]:
+        raise NotImplementedError("Coordinates not implemented for scale panels")
 
     def get_strips(self) -> List["MockPixelStrip"]:
         return [panel.strip for panel in self.panels]

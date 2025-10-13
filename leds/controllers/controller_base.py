@@ -1,9 +1,12 @@
 from functools import cache
-from typing import Type, Any, Tuple, Callable, Union, List, Dict
+from typing import TYPE_CHECKING, Type, Any, Tuple, Callable, Union, List, Dict
 from abc import ABC, abstractmethod
 import math
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
+
+if TYPE_CHECKING:
+    from config import BaseConfig
 
 # Try to import the real library first
 try:
@@ -27,10 +30,11 @@ def get_library(mock: bool) -> Tuple[Type[Any], bool]:
 
 
 class ControllerBase(ABC):
-    def __init__(self, mock: bool):
+    def __init__(self, config: "BaseConfig", mock: bool):
         PixelStrip, is_real = get_library(mock)
         self.is_mock = not is_real
         self.PixelStrip: Type[MockPixelStrip] = PixelStrip
+        self.config = config
 
     @staticmethod
     def init_strip(
@@ -53,7 +57,7 @@ class ControllerBase(ABC):
         highest = 0
 
         def distance_callback(
-            distance: float, index: Tuple[int, int] # pylint: disable=unused-argument
+            distance: float, index: Tuple[int, int]  # pylint: disable=unused-argument
         ) -> None:
             nonlocal highest
             highest = max(highest, distance)
@@ -69,7 +73,9 @@ class ControllerBase(ABC):
         lowest_y = 0
 
         def x_callback(
-            x: float, y: float, index: Tuple[int, int] # pylint: disable=unused-argument
+            x: float,
+            y: float,
+            index: Tuple[int, int],  # pylint: disable=unused-argument
         ) -> None:
             nonlocal highest_x
             nonlocal highest_y
@@ -82,6 +88,10 @@ class ControllerBase(ABC):
 
         self.map_coordinates(x_callback)
         return highest_x, highest_y, lowest_x, lowest_y
+
+    @abstractmethod
+    def get_coordinates(self, strip_index: int, led_index: int) -> Tuple[float, float]:
+        pass
 
     @abstractmethod
     def map_coordinates(
@@ -155,21 +165,24 @@ class ControllerBase(ABC):
             for i in range(strip.numPixels()):
                 strip.setPixelColor(i, color)
 
-    def json(self) -> List[List[Dict[str, int]]]:
-        pixels: List[List[Dict[str, int]]] = []
-        for strip in self.get_strips():
-            strip_pixels: List[Dict[str, int]] = []
+    def json(self) -> List[List[Dict[str, Union[int, float]]]]:
+        pixels: List[List[Dict[str, Union[int, float]]]] = []
+        for strip_index, strip in enumerate(self.get_strips()):
+            strip_pixels: List[Dict[str, Union[int, float]]] = []
             for i in range(strip.numPixels()):
                 pixel = strip.getPixelColorRGBW(i)
-                strip_pixels.append(
-                    {
-                        "r": pixel.r,
-                        "g": pixel.g,
-                        "b": pixel.b,
-                        "w": pixel.w,
-                        "brightness": strip.getBrightness(),
-                    }
-                )
+                pixel_data: Dict[str, Union[int, float]] = {
+                    "r": pixel.r,
+                    "g": pixel.g,
+                    "b": pixel.b,
+                    "w": pixel.w,
+                    "brightness": strip.getBrightness(),
+                }
+                if self.config.debug_positions:
+                    x, y = self.get_coordinates(strip_index, i)
+                    pixel_data["x"] = x
+                    pixel_data["y"] = y
+                strip_pixels.append(pixel_data)
             pixels.append(strip_pixels)
         return pixels
 
