@@ -136,7 +136,7 @@ def run_leds(mock: bool = False, debug: bool = False) -> None:
 
     print("Running LED implementation...")
     activate_script = get_venv_activate("led")
-    flags = []
+    flags: List[str] = []
     if mock:
         flags.append("--mock")
     if debug:
