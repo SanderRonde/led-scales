@@ -78,6 +78,7 @@ class LEDs:
         self._config_data = self._load_config()
         self._power_state = self._config_data.get("power_state", True)
         self._brightness = self._config_data.get("brightness", 1.0)
+        self._active_preset_id = self._config_data.get("active_preset_id", None)
         self._fade_start_time = 0
         self._fade_duration = 300  # ms
         self._target_power_state = self._power_state
@@ -105,6 +106,7 @@ class LEDs:
         self._config_data["power_state"] = self._power_state
         self._config_data["effect_name"] = self._effect.__class__.__name__
         self._config_data["brightness"] = self._brightness
+        self._config_data["active_preset_id"] = self._active_preset_id
         # Save entire config including presets
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(self._config_data, f, indent=2)
@@ -128,6 +130,7 @@ class LEDs:
                 "power_state": self._power_state,
                 "target_power_state": self._target_power_state,
                 "brightness": self._brightness,
+                "active_preset_id": self._active_preset_id,
             },
             namespace="/",
         )
@@ -243,6 +246,9 @@ class LEDs:
             if "brightness" in data:
                 self._brightness = data["brightness"]
 
+            # Set active preset ID
+            self._active_preset_id = data.get("id", None)
+
             self._running = True
             self._save_config()
             self._emit_effects_update()
@@ -290,9 +296,13 @@ class LEDs:
                             param_value
                         )
 
+            # Clear active preset since values were modified
+            self._active_preset_id = None
+
             self._running = True
             self._save_config()  # Save the updated configuration
             self._emit_effects_update()
+            self._emit_state_update()
             return jsonify({"success": True})
 
         @self._app.route("/config")
@@ -313,6 +323,8 @@ class LEDs:
             if "brightness" in data:
                 brightness: float = data.get("brightness", 1.0)
                 self._brightness = max(0.0, min(1.0, brightness))
+                # Clear active preset since brightness was modified
+                self._active_preset_id = None
 
             self._save_config()
             self._emit_state_update()
@@ -322,6 +334,7 @@ class LEDs:
                     "power_state": self._power_state,
                     "target_power_state": self._target_power_state,
                     "brightness": self._brightness,
+                    "active_preset_id": self._active_preset_id,
                 }
             )
 
@@ -332,6 +345,7 @@ class LEDs:
                     "power_state": self._power_state,
                     "target_power_state": self._target_power_state,
                     "brightness": self._brightness,
+                    "active_preset_id": self._active_preset_id,
                 }
             )
 
