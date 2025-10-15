@@ -101,13 +101,13 @@ class LEDs:
     def _save_config(self) -> None:
         """Save the current configuration to disk"""
         save_path = self._get_config_path()
-        config_data = {
-            "power_state": self._power_state,
-            "effect_name": self._effect.__class__.__name__,
-            "brightness": self._brightness,
-        }
+        # Update the config data with current state
+        self._config_data["power_state"] = self._power_state
+        self._config_data["effect_name"] = self._effect.__class__.__name__
+        self._config_data["brightness"] = self._brightness
+        # Save entire config including presets
         with open(save_path, "w", encoding="utf-8") as f:
-            json.dump(config_data, f)
+            json.dump(self._config_data, f, indent=2)
 
     def _load_config(self) -> Dict[str, Any]:
         """Load the configuration from disk"""
@@ -119,6 +119,43 @@ class LEDs:
                 return json.load(f)
         except (json.JSONDecodeError, KeyError):
             return {"power_state": True}
+
+    def _emit_state_update(self) -> None:
+        """Emit current state through WebSocket"""
+        self._socketio.emit(  # type: ignore
+            "state_update",
+            {
+                "power_state": self._power_state,
+                "target_power_state": self._target_power_state,
+                "brightness": self._brightness,
+            },
+            namespace="/",
+        )
+
+    def _emit_effects_update(self) -> None:
+        """Emit current effects through WebSocket"""
+        effect_parameters = get_all_effects_parameters(self._effects)
+        self._socketio.emit(  # type: ignore
+            "effects_update",
+            {
+                "effect_parameters": effect_parameters,
+                "effect_names": {
+                    effect_name: effect.get_name()
+                    for effect_name, effect in self._effects.items()
+                },
+                "current_effect": self._effect.__class__.__name__,
+            },
+            namespace="/",
+        )
+
+    def _emit_presets_update(self) -> None:
+        """Emit current presets through WebSocket"""
+        presets = self._config_data.get("presets", [])
+        self._socketio.emit(  # type: ignore
+            "presets_update",
+            presets,
+            namespace="/",
+        )
 
     def _init_routes(self) -> None:
         @self._app.route("/")
@@ -176,6 +213,7 @@ class LEDs:
 
             self._config_data["presets"] = presets
             self._save_config()
+            self._emit_presets_update()
             return jsonify(preset)
 
         @self._app.route("/presets/<int:preset_id>", methods=["DELETE"])
@@ -183,6 +221,7 @@ class LEDs:
             presets = self._config_data.get("presets", [])
             self._config_data["presets"] = [p for p in presets if p["id"] != preset_id]
             self._save_config()
+            self._emit_presets_update()
             return jsonify({"success": True})
 
         @self._app.route("/presets/apply", methods=["POST"])
@@ -206,6 +245,8 @@ class LEDs:
 
             self._running = True
             self._save_config()
+            self._emit_effects_update()
+            self._emit_state_update()
             return jsonify({"success": True})
 
         @self._app.route("/effects")
@@ -251,6 +292,7 @@ class LEDs:
 
             self._running = True
             self._save_config()  # Save the updated configuration
+            self._emit_effects_update()
             return jsonify({"success": True})
 
         @self._app.route("/config")
@@ -273,6 +315,7 @@ class LEDs:
                 self._brightness = max(0.0, min(1.0, brightness))
 
             self._save_config()
+            self._emit_state_update()
             return jsonify(
                 {
                     "success": True,
@@ -291,6 +334,13 @@ class LEDs:
                     "brightness": self._brightness,
                 }
             )
+
+        @self._socketio.on("connect")
+        def handle_connect():  # type: ignore  # pylint: disable=unused-variable
+            """Emit full state when a client connects"""
+            self._emit_state_update()
+            self._emit_effects_update()
+            self._emit_presets_update()
 
     def listen(self) -> None:
         """Start the web server in the main thread"""
@@ -311,6 +361,7 @@ class LEDs:
         self._effect = self._effects[effect_name]
         self._running = True
         self._save_config()  # Save the updated configuration
+        self._emit_effects_update()
         return self._effect
 
     def start(self) -> None:
@@ -348,10 +399,9 @@ class LEDs:
                     self._controller.show()
 
                 # Emit LED data through WebSocket
-                if self._controller.is_mock:
-                    self._socketio.emit(  # type: ignore
-                        "led_update", self._controller.json(), namespace="/"
-                    )
+                self._socketio.emit(  # type: ignore
+                    "led_update", self._controller.json(), namespace="/"
+                )
 
                 # FPS tracking and debug output
                 if self._debug:
