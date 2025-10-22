@@ -1,13 +1,27 @@
 import time
+import argparse
 from config import HexConfig
 from leds.color import RGBW
 from leds.controllers.controller_base import get_library
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="LED performance test with configurable pins"
+    )
+    parser.add_argument("--pin", type=int, default=None, help="GPIO pin number")
+    parser.add_argument("--channel", type=int, default=None, help="DMA channel number")
+    args = parser.parse_args()
+
     config = HexConfig()
     PixelStrip, _ = get_library(False)
-    (pin, channel) = config.pins
+
+    # Use provided pins or fall back to config
+    if args.pin is not None and args.channel is not None:
+        pin = args.pin
+        channel = args.channel
+    else:
+        (pin, channel) = config.pins
 
     strip = PixelStrip(
         num=config.get_led_count(),
