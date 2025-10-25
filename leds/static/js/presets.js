@@ -21,23 +21,23 @@ class PresetManager {
     constructor() {
         this.presets = [];
         this.currentPreset = null;
-        this.presetList = document.getElementById('preset-list');
-        this.saveButton = document.getElementById('save-preset');
-        this.presetNameInput = document.getElementById('preset-name');
-        
+        this.presetList = document.getElementById("preset-list");
+        this.saveButton = document.getElementById("save-preset");
+        this.presetNameInput = document.getElementById("preset-name");
+
         this.initializeEventListeners();
         this.loadPresets();
     }
 
     async loadPresets() {
         try {
-            const response = await fetch('/presets');
+            const response = await fetch("/presets");
             if (response.ok) {
                 this.presets = await response.json();
                 this.renderPresets();
             }
         } catch (error) {
-            console.error('Error loading presets:', error);
+            console.error("Error loading presets:", error);
         }
     }
 
@@ -46,9 +46,11 @@ class PresetManager {
      * @private
      */
     initializeEventListeners() {
-        this.saveButton.addEventListener('click', () => this.saveCurrentPreset());
-        this.presetNameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+        this.saveButton.addEventListener("click", () =>
+            this.saveCurrentPreset()
+        );
+        this.presetNameInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
                 this.saveCurrentPreset();
             }
         });
@@ -64,27 +66,29 @@ class PresetManager {
 
         const preset = {
             name,
-            effect: document.getElementById('effect-select').value,
-            brightness: parseInt(document.getElementById('brightness-slider').value) / 100,
-            parameters: this.getCurrentParameters()
+            effect: document.getElementById("effect-select").value,
+            brightness:
+                parseInt(document.getElementById("brightness-slider").value) /
+                100,
+            parameters: this.getCurrentParameters(),
         };
 
         try {
-            const response = await fetch('/presets', {
-                method: 'POST',
+            const response = await fetch("/presets", {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
-                body: JSON.stringify(preset)
+                body: JSON.stringify(preset),
             });
 
             if (response.ok) {
                 const savedPreset = await response.json();
                 await this.loadPresets(); // Reload all presets
-                this.presetNameInput.value = '';
+                this.presetNameInput.value = "";
             }
         } catch (error) {
-            console.error('Error saving preset:', error);
+            console.error("Error saving preset:", error);
         }
     }
 
@@ -95,9 +99,11 @@ class PresetManager {
      */
     getCurrentParameters() {
         const parameters = {};
-        const parameterInputs = document.querySelectorAll('#parameters input, #parameters select');
-        parameterInputs.forEach(input => {
-            parameters[input.id] = input.value;
+        const parameterInputs = document.querySelectorAll(
+            "#parameters input, #parameters select"
+        );
+        parameterInputs.forEach((input) => {
+            parameters[input.getAttribute("data-param")] = input.value;
         });
         return parameters;
     }
@@ -110,12 +116,12 @@ class PresetManager {
     async applyPreset(preset) {
         try {
             // Update UI elements
-            document.getElementById('effect-select').value = preset.effect;
+            document.getElementById("effect-select").value = preset.effect;
             updateBrightnessSliderState(preset.brightness);
 
             // Trigger effect change to update parameters
-            const event = new Event('change');
-            document.getElementById('effect-select').dispatchEvent(event);
+            const event = new Event("change");
+            document.getElementById("effect-select").dispatchEvent(event);
 
             // Set parameters after a short delay to allow parameter inputs to be created
             setTimeout(() => {
@@ -123,18 +129,18 @@ class PresetManager {
                     const input = document.getElementById(id);
                     if (input) {
                         input.value = value;
-                        input.dispatchEvent(new Event('change'));
+                        input.dispatchEvent(new Event("change"));
                     }
                 });
             }, 100);
 
             // Apply the preset on the server
-            const response = await fetch('/presets/apply', {
-                method: 'POST',
+            const response = await fetch("/presets/apply", {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
-                body: JSON.stringify(preset)
+                body: JSON.stringify(preset),
             });
 
             if (response.ok) {
@@ -142,7 +148,7 @@ class PresetManager {
                 this.renderPresets();
             }
         } catch (error) {
-            console.error('Error applying preset:', error);
+            console.error("Error applying preset:", error);
         }
     }
 
@@ -153,14 +159,14 @@ class PresetManager {
     async deletePreset(presetId) {
         try {
             const response = await fetch(`/presets/${presetId}`, {
-                method: 'DELETE'
+                method: "DELETE",
             });
 
             if (response.ok) {
                 await this.loadPresets(); // Reload all presets
             }
         } catch (error) {
-            console.error('Error deleting preset:', error);
+            console.error("Error deleting preset:", error);
         }
     }
 
@@ -169,11 +175,13 @@ class PresetManager {
      * @private
      */
     renderPresets() {
-        this.presetList.innerHTML = '';
-        
-        this.presets.forEach(preset => {
-            const presetElement = document.createElement('div');
-            presetElement.className = `preset-item ${this.currentPreset?.id === preset.id ? 'active' : ''}`;
+        this.presetList.innerHTML = "";
+
+        this.presets.forEach((preset) => {
+            const presetElement = document.createElement("div");
+            presetElement.className = `preset-item ${
+                this.currentPreset?.id === preset.id ? "active" : ""
+            }`;
             presetElement.innerHTML = `
                 <span>${preset.name}</span>
                 <div class="preset-actions">
@@ -181,10 +189,12 @@ class PresetManager {
                 </div>
             `;
 
-            presetElement.addEventListener('click', () => this.applyPreset(preset));
-            
-            const deleteButton = presetElement.querySelector('.delete');
-            deleteButton.addEventListener('click', (e) => {
+            presetElement.addEventListener("click", () =>
+                this.applyPreset(preset)
+            );
+
+            const deleteButton = presetElement.querySelector(".delete");
+            deleteButton.addEventListener("click", (e) => {
                 e.stopPropagation();
                 this.deletePreset(preset.id);
             });
@@ -195,6 +205,6 @@ class PresetManager {
 }
 
 // Initialize the preset manager when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
     window.presetManager = new PresetManager();
 });
