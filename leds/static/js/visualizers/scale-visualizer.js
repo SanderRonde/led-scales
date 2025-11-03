@@ -9,7 +9,7 @@ import { LEDVisualizerBase } from "./visualizer-base.js";
  * @property {number} spacing - Spacing between scales
  * @property {number} total_width - Total width of all panels
  * @property {number} total_height - Total height of all panels
- * @property {number} panel_spacing_scales - Spacing between panels in scale units
+ * @property {number} space_between_panels - Spacing between panels in scale units
  * @property {number} scale_length - Length of each scale
  * @property {number} scale_width - Width of each scale
  * @property {number} delay - Delay between updates in milliseconds
@@ -32,11 +32,11 @@ export class ScaleLEDVisualizer extends LEDVisualizerBase {
      * @param {number} index - LED index
      * @param {number} x - X coordinate
      * @param {number} y - Y coordinate
-     * @param {import("./visualizer-base.js").LED} color - RGB color object
+     * @param {import("./visualizer-base.js").LED} led - RGB color object
      * @param {number} scale - Scale factor
      * @param {Config} config - Configuration object
      */
-    drawScale(index, x, y, color, scale, config) {
+    drawScale(index, x, y, led, scale, config) {
         // Calculate angle towards the center
         const centerX = config.total_width / 2;
         const centerY = config.total_height / 2 + config.scale_length / 2;
@@ -98,11 +98,22 @@ export class ScaleLEDVisualizer extends LEDVisualizerBase {
         this.ctx.beginPath();
         this.ctx.arc(x * scale, y * scale, 5 * scale, 0, Math.PI * 2);
         // Apply brightness to RGB values
-        const brightness = color.brightness / 255; // Default to 1.0 if not provided
-        this.ctx.fillStyle = `rgb(${color.r * brightness}, ${
-            color.g * brightness
-        }, ${color.b * brightness})`;
-        this.ctx.fill();
+        const brightness = led.brightness / 255; // Default to 1.0 if not provided
+
+        if (led.x !== undefined && led.y !== undefined) {
+            this.ctx.font = "8px Arial";
+            this.ctx.fillStyle = "white";
+            this.ctx.fillText(
+                `(${led.x.toFixed(1)}, ${led.y.toFixed(1)})`,
+                x * scale,
+                y * scale
+            );
+        } else {
+            this.ctx.fillStyle = `rgb(${led.r * brightness}, ${
+                led.g * brightness
+            }, ${led.b * brightness})`;
+            this.ctx.fill();
+        }
     }
 
     /**
@@ -116,7 +127,7 @@ export class ScaleLEDVisualizer extends LEDVisualizerBase {
             const panelOffsetX =
                 panel *
                     (this.config.x_count * this.config.spacing +
-                        this.config.spacing) +
+                        this.config.space_between_panels) +
                 this.config.spacing / 2;
 
             for (let x = 0; x < this.config.x_count; x++) {
