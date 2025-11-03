@@ -3,6 +3,7 @@ import os
 import sys
 import subprocess
 import venv
+import platform
 import signal
 import threading
 import time
@@ -150,6 +151,53 @@ def run_leds(mode: ConfigMode, mock: bool = False, debug: bool = False) -> None:
         cmd = f'. "{activate_script}" && leds {flags_str}'
     run_command(cmd)
 
+def install_leds(mode: ConfigMode) -> None:
+    print("Installing LEDs service")
+
+    if platform.system() != "Linux":
+        print("Only supported on linux")
+        sys.exit(1)
+
+    if os.geteuid() != 0: # type: ignore
+        pass
+
+    service_name = "leds"
+    service_dir = Path("/etc/systemd/system")
+    target_path = service_dir / (service_name + ".service")
+
+    # Read source file
+    source_path = Path("./leds/scripts/leds.service")
+    try:
+        content = source_path.read_text()
+    except FileNotFoundError:
+        print(f"Source file {source_path} does not exist.")
+        return
+
+    # Replace {mode} placeholder
+    content = content.replace("{mode}", mode)
+
+    # Ensure /etc/systemd/system exists
+    service_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write modified service file
+    try:
+        target_path.write_text(content)
+        print(f"Installed service file to {target_path}")
+    except PermissionError:
+        print(f"Permission denied: run with sudo to write to {target_path}")
+        return
+
+    # Print instructions for the user
+    print("\nYou can now manage the service using systemctl:")
+    print(f"  sudo systemctl daemon-reload")
+    print(f"  sudo systemctl enable {service_name}")
+    print(f"  sudo systemctl start {service_name}")
+    print(f"  sudo systemctl status {service_name}")
+    print(f"  sudo systemctl stop {service_name}")
+    print(f"  sudo systemctl disable {service_name}")
+
+
+    pass
 
 def clean() -> None:
     print("Cleaning up...")
@@ -226,6 +274,7 @@ def print_help() -> None:
     )
     print("  python main.py all                     - Generate all needed files")
     print("  python main.py help                    - Show this help message")
+    print("  python main.py install-leds <mode>     - Install LEDs as systemd service")
     print("  python main.py leds <mode>             - Run the LED implementation")
     print(
         "  python main.py leds-mock <mode>        - Run the LED implementation in mock mode"
@@ -380,6 +429,8 @@ if __name__ == "__main__":
         clean()
     elif command == "help":
         print_help()
+    elif command == "install-leds":
+        install_leds(get_mode())
     elif command == "leds":
         run_leds(get_mode())
     elif command == "leds-mock":
