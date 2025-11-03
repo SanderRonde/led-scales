@@ -1,5 +1,11 @@
+import sys
 import time
 import argparse
+from pathlib import Path
+
+# Add parent directories to path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 from config import HexConfig
 from leds.color import RGBW
 from leds.controllers.controller_base import get_library
@@ -26,7 +32,7 @@ def main():
     strip = PixelStrip(
         num=config.get_led_count(),
         pin=pin,
-        brightness=255,
+        brightness=25,
         freq_hz=800000,
         dma=10,
         channel=channel,
