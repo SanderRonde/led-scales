@@ -158,8 +158,9 @@ def install_leds(mode: ConfigMode) -> None:
         print("Only supported on linux")
         sys.exit(1)
 
-    if os.geteuid() != 0: # type: ignore
-        pass
+    if os.geteuid() != 0: # type: ignore pylint: disable=no-member
+        print("Run this as root")
+        sys.exit(1)
 
     service_name = "leds"
     service_dir = Path("/etc/systemd/system")
@@ -168,7 +169,7 @@ def install_leds(mode: ConfigMode) -> None:
     # Read source file
     source_path = Path("./leds/scripts/leds.service")
     try:
-        content = source_path.read_text()
+        content = source_path.read_text("utf-8")
     except FileNotFoundError:
         print(f"Source file {source_path} does not exist.")
         return
@@ -191,15 +192,12 @@ def install_leds(mode: ConfigMode) -> None:
 
     # Print instructions for the user
     print("\nYou can now manage the service using systemctl:")
-    print(f"  sudo systemctl daemon-reload")
+    print("  sudo systemctl daemon-reload")
     print(f"  sudo systemctl enable {service_name}")
     print(f"  sudo systemctl start {service_name}")
     print(f"  sudo systemctl status {service_name}")
     print(f"  sudo systemctl stop {service_name}")
     print(f"  sudo systemctl disable {service_name}")
-
-
-    pass
 
 def clean() -> None:
     print("Cleaning up...")

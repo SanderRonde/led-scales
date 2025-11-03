@@ -17,10 +17,6 @@ from flask import (  # pylint: disable=import-error
 )
 from flask.json.provider import JSONProvider  # pylint: disable=import-error
 from flask_socketio import SocketIO  # pylint: disable=import-error
-
-# Add parent directories to path
-sys.path.append(str(Path(__file__).parent))
-
 from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
 from leds.effects.rainbow_radial import RainbowRadialEffect
