@@ -146,9 +146,9 @@ def run_leds(mode: ConfigMode, mock: bool = False, debug: bool = False) -> None:
     flags_str = " ".join(flags)
 
     if sys.platform == "win32":
-        cmd = f'"{activate_script}" && leds {flags_str}'
+        cmd = f'"{activate_script}" && python -m leds.leds {flags_str}'
     else:
-        cmd = f'. "{activate_script}" && leds {flags_str}'
+        cmd = f'. "{activate_script}" && python -m leds.leds {flags_str}'
     run_command(cmd)
 
 def install_leds(mode: ConfigMode) -> None:
