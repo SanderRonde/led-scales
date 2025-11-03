@@ -37,7 +37,7 @@ class ScaleConfig(BaseConfig):
 
     # Panel layout
     spacing: int = 55  # Spacing between scales
-    panel_spacing_scales: int = 1  # Spacing between panels
+    panel_spacing_scales: int = 3  # Spacing between panels in scales
     x_count: int = 6
     y_count: int = 12
     panel_count: int = 3
@@ -97,9 +97,13 @@ class ScaleConfig(BaseConfig):
         return self.y_print_bed - (self.print_outside_padding * 2)
 
     @property
+    def space_between_panels(self) -> float:
+        return self.spacing * self.panel_spacing_scales
+
+    @property
     def total_width(self) -> float:
         return self.panel_width * self.panel_count + (
-            self.spacing * (self.panel_count - 1)
+            (self.space_between_panels) * (self.panel_count - 1)
         )
 
     @property
