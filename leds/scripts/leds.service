@@ -6,8 +6,8 @@ After=multi-user.target
 
 [Service]
 Type=idle
-ExecStart=/usr/bin/python /home/sander/projects/led-scales/main.py leds {mode}
-WorkingDirectory=/home/sander/projects/led-scales
+ExecStart=/usr/bin/python {cwd}/main.py leds {mode}
+WorkingDirectory={cwd}
 
 [Install]
 WantedBy=multi-user.target

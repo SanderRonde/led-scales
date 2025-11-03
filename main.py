@@ -174,7 +174,9 @@ def install_leds(mode: ConfigMode) -> None:
         return
 
     # Replace {mode} placeholder
+    cwd = str(Path(__file__).parent.resolve())
     content = content.replace("{mode}", mode)
+    content = content.replace("{cwd}", cwd)
 
     # Ensure /etc/systemd/system exists
     service_dir.mkdir(parents=True, exist_ok=True)
