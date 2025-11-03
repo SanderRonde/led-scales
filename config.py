@@ -22,7 +22,7 @@ class ScaleConfig(BaseConfig):
     web_port: int = 5001
     # A tuple of (pin, channel) per panel
     pins: List[Tuple[int, int]] = field(
-        default_factory=lambda: [(13, 1), (19, 1), (26, 2)]
+        default_factory=lambda: [(13, 1), (18, 0), (21, 0)]
     )
 
     # Scale dimensions
