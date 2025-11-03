@@ -4,7 +4,7 @@
 # pyright: reportPrivateUsage=false
 
 # To auto watch and run:
-# bun x nodemon --exec "python led-scales.py" --watch "led-scales.py"
+# bun x nodemon --exec "python cad/led-scales.py" --watch "cad/led-scales.py"
 
 import math
 import subprocess
@@ -12,7 +12,7 @@ import sys
 import os
 import shutil
 from enum import Enum
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Callable
 import openpyscad as ops
 from config import ScaleConfig
 
@@ -59,6 +59,35 @@ def lean_angle(distance: float):
     return config.lean_base + (distance * config.lean_factor)
 
 
+def hsv_to_rgb(h: float, s: float = 1.0, v: float = 1.0) -> str:
+    """Convert HSV color to RGB hex string. H is in degrees (0-360), S and V are 0-1."""
+    h = h % 360
+    s = max(0, min(1, s))
+    v = max(0, min(1, v))
+
+    c = v * s
+    x = c * (1 - abs((h / 60) % 2 - 1))
+    m = v - c
+
+    if h < 60:
+        r, g, b = c, x, 0
+    elif h < 120:
+        r, g, b = x, c, 0
+    elif h < 180:
+        r, g, b = 0, c, x
+    elif h < 240:
+        r, g, b = 0, x, c
+    elif h < 300:
+        r, g, b = x, 0, c
+    else:
+        r, g, b = c, 0, x
+
+    r = int(round((r + m) * 255))
+    g = int(round((g + m) * 255))
+    b = int(round((b + m) * 255))
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
 def draw_scale_3d(distance: float):
     size_of_scale = config.base_length + config.base_width
 
@@ -74,30 +103,76 @@ def draw_scale_3d(distance: float):
 def draw_scale(mode: Mode, distance: float):
     if mode in [Mode.TWO_D, Mode.POSITIONING]:
         result = Projection(cut=True).append(draw_scale_3d(distance))
-        if mode != Mode.POSITIONING:
+        if mode == Mode.TWO_D:
             result = result + ops.Circle(d=config.led_template_diameter)
         return result
     return draw_scale_3d(distance)
 
 
-def draw_panel(mode: Mode, scale_x_offset: int):
-    coordinate_map: Dict[Tuple[float, float], float] = {}
+def get_coordinate_map(panel_index: int, scale_x_offset: int):
+    coordinate_map: Dict[Tuple[int, float, float], float] = {}
 
-    panel = ops.Union()
     x_half = math.floor(config.x_count / 2)
     y_half = math.floor(config.y_count / 2)
     for _i in range(-x_half, x_half):
         i = _i + scale_x_offset
         for j in range(-y_half, y_half):
             distance: float = math.sqrt(i * i + j * j) * config.spacing
+            coordinate_map[(panel_index, i + 0.5, j)] = distance
+            if i != -x_half:
+                coordinate_map[(panel_index, i, j + 0.5)] = distance
 
-            coordinate_map[(i + 0.5, j)] = distance
+    return coordinate_map
+
+
+def draw_panel(
+    mode: Mode,
+    panel_index: int,
+    coordinate_map: Dict[Tuple[int, float, float], float],
+    sorted_coordinates: List[Tuple[Tuple[int, float, float], float]],
+    scale_x_offset: int,
+):
+    x_half = math.floor(config.x_count / 2)
+    y_half = math.floor(config.y_count / 2)
+
+    get_text: Callable[[int], ops.Text] = lambda coordinate_map_index: (
+        ops.Text(
+            f'"{coordinate_map_index}"',
+            size=6,
+            halign='"center"',
+            valign='"center"',
+        ).color(hsv_to_rgb(coordinate_map_index % 360))
+        if mode != Mode.PRINT
+        else None
+    )
+
+    panel = ops.Union()
+    for _i in range(-x_half, x_half):
+        i = _i + scale_x_offset
+        for j in range(-y_half, y_half):
+            coordinate_map_key = (panel_index, i + 0.5, j)
+            distance = coordinate_map[coordinate_map_key]
+            coordinate_map_index = sorted_coordinates.index(
+                (coordinate_map_key, distance)
+            )
+
             panel.append(
-                draw_scale(mode, distance)
-                .rotate(
-                    [0, 0, 0 if mode == Mode.PRINT else math.degrees(math.atan2(j, i))]
-                )
-                .translate(
+                (
+                    (
+                        (draw_scale(mode, distance)).rotate(
+                            [
+                                0,
+                                0,
+                                (
+                                    0
+                                    if mode == Mode.PRINT
+                                    else math.degrees(math.atan2(j, i))
+                                ),
+                            ]
+                        )
+                    )
+                    + get_text(coordinate_map_index)
+                ).translate(
                     [
                         -(i * config.spacing) - (config.spacing / 2),
                         -(j * config.spacing),
@@ -106,21 +181,27 @@ def draw_panel(mode: Mode, scale_x_offset: int):
                 )
             )
             if i != -x_half:
-                coordinate_map[(i, j + 0.5)] = distance
+                coordinate_map_key = (panel_index, i, j + 0.5)
+                coordinate_map_index = sorted_coordinates.index(
+                    (coordinate_map_key, distance)
+                )
                 panel.append(
-                    draw_scale(mode, distance)
-                    .rotate(
-                        [
-                            0,
-                            0,
-                            (
-                                0
-                                if mode == Mode.PRINT
-                                else math.degrees(math.atan2(j + 0.5, i))
-                            ),
-                        ]
-                    )
-                    .translate(
+                    (
+                        (
+                            draw_scale(mode, distance).rotate(
+                                [
+                                    0,
+                                    0,
+                                    (
+                                        0
+                                        if mode == Mode.PRINT
+                                        else math.degrees(math.atan2(j + 0.5, i))
+                                    ),
+                                ]
+                            )
+                        )
+                        + get_text(coordinate_map_index)
+                    ).translate(
                         [
                             -(i * config.spacing),
                             -(j * config.spacing) - (config.spacing / 2),
@@ -128,31 +209,45 @@ def draw_panel(mode: Mode, scale_x_offset: int):
                         ]
                     )
                 )
-    return (panel, coordinate_map)
+    return panel
 
 
 def draw(mode: Mode):
-    joined_coordinate_map: Dict[Tuple[float, float], float] = {}
+    joined_coordinate_map: Dict[Tuple[int, float, float], float] = {}
+    center_coordinate_map = get_coordinate_map(0, 0)
+    joined_coordinate_map.update(center_coordinate_map)
+
+    for i in range(1, math.floor((config.panel_count - 1) / 2) + 1):
+        left_offset = i * config.x_count + config.panel_spacing_scales
+        left_coordinate_map = get_coordinate_map(-i, left_offset)
+        joined_coordinate_map.update(left_coordinate_map)
+
+        right_offset = -(i * config.x_count) - config.panel_spacing_scales
+        right_coordinate_map = get_coordinate_map(i, right_offset)
+        joined_coordinate_map.update(right_coordinate_map)
+
+    sorted_coordinates = sorted(joined_coordinate_map.items(), key=lambda x: x[1])
 
     result = ops.Union()
     panels: List[ops.Union] = []
-    (center_panel, center_coordinate_map) = draw_panel(mode, 0)
-    joined_coordinate_map.update(center_coordinate_map)
+    center_panel = draw_panel(mode, 0, joined_coordinate_map, sorted_coordinates, 0)
     panels.append(center_panel)
     result.append(center_panel)
 
     for i in range(1, math.floor((config.panel_count - 1) / 2) + 1):
         left_offset = i * config.x_count + config.panel_spacing_scales
-        (left_panel, left_coordinate_map) = draw_panel(mode, left_offset)
+        left_panel = draw_panel(
+            mode, -i, joined_coordinate_map, sorted_coordinates, left_offset
+        )
         panels.append(left_panel.translate([left_offset * config.spacing, 0, 0]))
         result.append(left_panel)
-        joined_coordinate_map.update(left_coordinate_map)
 
         right_offset = -(i * config.x_count) - config.panel_spacing_scales
-        (right_panel, right_coordinate_map) = draw_panel(mode, right_offset)
+        right_panel = draw_panel(
+            mode, i, joined_coordinate_map, sorted_coordinates, right_offset
+        )
         panels.append(right_panel.translate([right_offset * config.spacing, 0, 0]))
         result.append(right_panel)
-        joined_coordinate_map.update(right_coordinate_map)
 
     return (result, joined_coordinate_map, panels)
 
@@ -196,7 +291,7 @@ def get_optimal_tile_x(
 
 
 def printable(
-    coordinate_map: Dict[Tuple[float, float], float], mode: Mode, preview: bool
+    coordinate_map: Dict[Tuple[int, float, float], float], mode: Mode, preview: bool
 ):
     distance_items = sorted(coordinate_map.items(), key=lambda item: item[1])
     result = ops.Union()
@@ -232,7 +327,7 @@ def printable(
         if config.x_per_build_plate_override is not None:
             x_per_build_plate = config.x_per_build_plate_override
 
-        if preview and mode != Mode.POSITIONING:
+        if preview:
             result.append(
                 ops.Cube([config.print_bed_x, config.print_bed_y, 1])
                 .translate([tile_offset, 0, 0])
@@ -241,23 +336,12 @@ def printable(
 
         for x in range(x_per_build_plate):
             for y in range(y_per_build_plate):
-                key, d = distance_items[total_count]
+                _, d = distance_items[total_count]
                 translate_x = max_x_offset + tile_offset + (x * config.x_print_spacing)
                 translate_y = y * y_print_spacing
                 tile.append(
                     draw_scale(mode, d).translate([translate_x, translate_y, 0])
                 )
-
-                if mode == Mode.POSITIONING:
-                    text = (
-                        ops.Text(
-                            f'"{key}"', size=3, halign='"center"', valign='"center"'
-                        )
-                        .translate([translate_x, translate_y])
-                        .translate([-config.x_print_spacing / 2, 0, 0])
-                    )
-                    text.turn_on_debug()
-                    result.append(text)
 
                 total_count += 1
                 if total_count >= len(distance_items):
@@ -267,7 +351,7 @@ def printable(
 
 def main(mode: Mode, preview: bool = False):
     (result, coordinate_map, _) = draw(mode)
-    if mode not in [Mode.PRINT, Mode.POSITIONING]:
+    if mode != Mode.PRINT:
         return result
     (printable_result, tiles) = printable(coordinate_map, mode, preview)
     if not preview:
@@ -412,7 +496,7 @@ for directory in [tiles_dir, panels_dir, diffuser_dir]:
 main(Mode.THREE_D, preview=True).write(os.path.join(out_dir, "led-scales-py.scad"))
 main(Mode.TWO_D, preview=True).write(os.path.join(out_dir, "led-scales-py.2d.scad"))
 main(Mode.PRINT, preview=False).write(os.path.join(out_dir, "led-scales-py.print.scad"))
-main(Mode.POSITIONING, preview=False).write(
+main(Mode.POSITIONING, preview=True).write(
     os.path.join(out_dir, "led-scales-py.positioning.scad")
 )
 

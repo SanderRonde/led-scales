@@ -58,7 +58,7 @@ class FloatParameter(Parameter):
 
     def get_value(self) -> float:
         """Get the value of the parameter"""
-        return self.value
+        return float(self.value)
 
 
 class ColorParameter(Parameter):
