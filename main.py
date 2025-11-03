@@ -8,6 +8,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Union, List, TextIO, Literal
+from config import ConfigMode
 
 
 def print_output(pipe: TextIO) -> None:
@@ -130,13 +131,13 @@ def generate_cad(mode: str = "") -> None:
     print("CAD generation complete! Files can be found in the cad/out directory")
 
 
-def run_leds(mock: bool = False, debug: bool = False) -> None:
+def run_leds(mode: ConfigMode, mock: bool = False, debug: bool = False) -> None:
     print("Setting up LED environment...")
     setup_venv("led")
 
     print("Running LED implementation...")
     activate_script = get_venv_activate("led")
-    flags: List[str] = []
+    flags: List[str] = [mode.value]
     if mock:
         flags.append("--mock")
     if debug:
@@ -208,27 +209,27 @@ def configure_led_order() -> None:
 
 def print_help() -> None:
     print("LED Scales CAD Generator:")
-    print("  python main.py setup    - Set up both development environments")
-    print("  python main.py generate - Generate CAD files (default mode)")
-    print("  python main.py 3d       - Generate 3D printable STL files for the scales")
-    print("  python main.py 2d       - Generate 2D SVG files for laser cutting/CNC")
-    print("  python main.py clean    - Clean up generated files and environments")
-    print("  python main.py all      - Generate all needed files")
-    print("  python main.py help     - Show this help message")
-    print("  python main.py leds     - Run the LED implementation")
-    print("  python main.py leds-mock - Run the LED implementation in mock mode")
+    print("  python main.py setup                   - Set up both development environments")
+    print("  python main.py generate                - Generate CAD files (default mode)")
+    print("  python main.py 3d                      - Generate 3D printable STL files for the scales")
+    print("  python main.py 2d                      - Generate 2D SVG files for laser cutting/CNC")
+    print("  python main.py clean                   - Clean up generated files and environments")
+    print("  python main.py all                     - Generate all needed files")
+    print("  python main.py help                    - Show this help message")
+    print("  python main.py leds <mode>             - Run the LED implementation")
+    print("  python main.py leds-mock <mode>        - Run the LED implementation in mock mode")
     print(
-        "  python main.py leds-debug - Run the LED implementation with debug output (FPS)"
+        "  python main.py leds-debug <mode>       - Run the LED implementation with debug output (FPS)"
     )
     print(
-        "  python main.py leds-mock-debug - Run the LED implementation in mock mode with debug output"
+        "  python main.py leds-mock-debug <mode>  - Run the LED implementation in mock mode with debug output"
     )
     print(
-        "  python main.py dev      - Run the server in development mode with auto-reload"
+        "  python main.py dev                     - Run the server in development mode with auto-reload"
     )
-    print("  python main.py lint     - Run pylint on the codebase")
-    print("  python main.py format   - Format the codebase using Black")
-    print("  python main.py configure-leds - Configure LED ordering for hexagon layout")
+    print("  python main.py lint                    - Run pylint on the codebase")
+    print("  python main.py format                  - Format the codebase using Black")
+    print("  python main.py configure-leds          - Configure LED ordering for hexagon layout")
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -342,6 +343,13 @@ if __name__ == "__main__":
 
     command = sys.argv[1]
 
+    def get_mode() -> ConfigMode:
+        mode = sys.argv[2] if len(sys.argv) > 2 else None
+        if not mode or mode not in list(ConfigMode):
+            print("Please pass a valid config mode. Should be one of", list(map(lambda x: x.value, list(ConfigMode))))
+            sys.exit(1)
+        return ConfigMode(mode)
+
     if command == "setup":
         setup_venv("cad")
         setup_venv("led")
@@ -356,13 +364,13 @@ if __name__ == "__main__":
     elif command == "help":
         print_help()
     elif command == "leds":
-        run_leds()
+        run_leds(get_mode())
     elif command == "leds-mock":
-        run_leds(True)
+        run_leds(get_mode(), True)
     elif command == "leds-debug":
-        run_leds(debug=True)
+        run_leds(get_mode(), debug=True)
     elif command == "leds-mock-debug":
-        run_leds(True, True)
+        run_leds(get_mode(), True, True)
     elif command == "dev":
         dev()  # New development mode with auto-reload
     elif command == "lint":

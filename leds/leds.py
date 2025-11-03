@@ -21,7 +21,7 @@ from leds.effects import Effect, get_effects
 from leds.effects.parameter_export import get_all_effects_parameters
 from leds.effects.rainbow_radial import RainbowRadialEffect
 from leds.controllers.controller_base import RGBW
-from config import get_led_controller, BaseConfig, get_config
+from config import get_led_controller, BaseConfig, get_config, ConfigMode
 
 # Add parent directory to Python path when running directly
 if __name__ == "__main__":
@@ -64,7 +64,7 @@ class LEDs:
         # Disable Flask request logging
         log = logging.getLogger("werkzeug")
         log.setLevel(logging.ERROR)
-        self._controller = get_led_controller(mock)
+        self._controller = get_led_controller(config, mock)
         self._init_routes()
         self._effects = get_effects(self._controller)
         self._running = False
@@ -437,10 +437,25 @@ class LEDs:
 
 
 def main() -> None:
-    mock = "--mock" in sys.argv
-    debug = "--debug" in sys.argv
 
-    leds = LEDs(mock, get_config(), debug)
+    mock = False
+    debug = False
+    mode: Union[None, ConfigMode] = None
+    for arg in sys.argv[1:]:
+        if arg == "--mock":
+            mock = True
+        elif arg == "--debug":
+            debug = True
+        else:
+            if arg not in list(ConfigMode):
+                print("Please pass a valid config mode. Should be one of", list(map(lambda x: x.value, list(ConfigMode))))
+                sys.exit(1)
+            mode = ConfigMode(arg)
+    if not mode:
+        print("Please pass a valid config mode. Should be one of", list(map(lambda x: x.value, list(ConfigMode))))
+        sys.exit(1)
+
+    leds = LEDs(mock, get_config(mode), debug)
     leds.start()  # Start effect thread
     leds.listen()  # Run Flask in main thread
 

@@ -1,4 +1,4 @@
-from typing import Type, Any, List, Tuple, Callable, Dict, Union, TYPE_CHECKING
+from typing import Type, Any, List, Tuple, Callable, Union, TYPE_CHECKING
 from leds.color import RGBW
 from leds.mock import MockPixelStrip
 from leds.controllers.controller_base import ControllerBase

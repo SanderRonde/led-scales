@@ -1,11 +1,15 @@
 from typing import Optional, Union, List, Tuple, Any, Dict
 from pathlib import Path
+from enum import Enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from leds import controllers
 
 # Unless otherwise specified, all dimensions are in mm
 
+class ConfigMode(str, Enum):
+    SCALE = "scale"
+    HEX = "hex"
 
 class BaseConfig(ABC):
     web_port: int = 5001
@@ -192,21 +196,22 @@ class HexConfig(BaseConfig):
     pins: Tuple[int, int] = (13, 1)
 
 
-# Change this to choose the config you want
-_config = HexConfig()
-# _config = ScaleConfig()
+def get_config(mode: ConfigMode) -> BaseConfig:
+    if mode == ConfigMode.HEX:
+        config = HexConfig()
+    elif mode == ConfigMode.SCALE:
+        config = ScaleConfig()
+    else:
+        raise ValueError("Unknown mode")
 
-# Always validate the config
-_config.validate()
+    # Always validate the config
+    config.validate()
+    return config
 
 
-def get_config() -> BaseConfig:
-    return _config
-
-
-def get_led_controller(mock: bool) -> controllers.ControllerBase:
-    if isinstance(_config, ScaleConfig):  # type: ignore
-        return controllers.ScalePanelLEDController(_config, mock)
-    if isinstance(_config, HexConfig):  # type: ignore
-        return controllers.HexPanelLEDController(_config, mock)
-    raise ValueError(f"Unknown config type: {type(_config)}")
+def get_led_controller(config: BaseConfig, mock: bool) -> controllers.ControllerBase:
+    if isinstance(config, ScaleConfig):  # type: ignore
+        return controllers.ScalePanelLEDController(config, mock)
+    if isinstance(config, HexConfig):  # type: ignore
+        return controllers.HexPanelLEDController(config, mock)
+    raise ValueError(f"Unknown config type: {type(config)}")
