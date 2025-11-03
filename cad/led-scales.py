@@ -2,6 +2,7 @@
 # pyright: reportUnknownVariableType=false
 # pyright: reportUnknownParameterType=false
 # pyright: reportPrivateUsage=false
+# pylint: disable=duplicate-code
 
 # To auto watch and run:
 # bun x nodemon --exec "python cad/led-scales.py" --watch "cad/led-scales.py"

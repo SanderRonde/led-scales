@@ -1,3 +1,5 @@
+# pylint: disable=duplicate-code
+
 import math
 from typing import Any, List, Tuple, Callable, Union, TYPE_CHECKING, Dict
 from leds.color import RGBW
