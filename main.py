@@ -209,15 +209,27 @@ def configure_led_order() -> None:
 
 def print_help() -> None:
     print("LED Scales CAD Generator:")
-    print("  python main.py setup                   - Set up both development environments")
-    print("  python main.py generate                - Generate CAD files (default mode)")
-    print("  python main.py 3d                      - Generate 3D printable STL files for the scales")
-    print("  python main.py 2d                      - Generate 2D SVG files for laser cutting/CNC")
-    print("  python main.py clean                   - Clean up generated files and environments")
+    print(
+        "  python main.py setup                   - Set up both development environments"
+    )
+    print(
+        "  python main.py generate                - Generate CAD files (default mode)"
+    )
+    print(
+        "  python main.py 3d                      - Generate 3D printable STL files for the scales"
+    )
+    print(
+        "  python main.py 2d                      - Generate 2D SVG files for laser cutting/CNC"
+    )
+    print(
+        "  python main.py clean                   - Clean up generated files and environments"
+    )
     print("  python main.py all                     - Generate all needed files")
     print("  python main.py help                    - Show this help message")
     print("  python main.py leds <mode>             - Run the LED implementation")
-    print("  python main.py leds-mock <mode>        - Run the LED implementation in mock mode")
+    print(
+        "  python main.py leds-mock <mode>        - Run the LED implementation in mock mode"
+    )
     print(
         "  python main.py leds-debug <mode>       - Run the LED implementation with debug output (FPS)"
     )
@@ -229,7 +241,9 @@ def print_help() -> None:
     )
     print("  python main.py lint                    - Run pylint on the codebase")
     print("  python main.py format                  - Format the codebase using Black")
-    print("  python main.py configure-leds          - Configure LED ordering for hexagon layout")
+    print(
+        "  python main.py configure-leds          - Configure LED ordering for hexagon layout"
+    )
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -346,7 +360,10 @@ if __name__ == "__main__":
     def get_mode() -> ConfigMode:
         mode = sys.argv[2] if len(sys.argv) > 2 else None
         if not mode or mode not in list(ConfigMode):
-            print("Please pass a valid config mode. Should be one of", list(map(lambda x: x.value, list(ConfigMode))))
+            print(
+                "Please pass a valid config mode. Should be one of",
+                list(map(lambda x: x.value, list(ConfigMode))),
+            )
             sys.exit(1)
         return ConfigMode(mode)
 

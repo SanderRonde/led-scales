@@ -36,10 +36,10 @@ class LEDPanel:
     def get_base_x(self) -> float:
         bottom_left_offset = -0.5 * self.config.x_count
         scales_offset = self.config.x_count * self.distance_from_center
-        inter_panel_spacing_offset = self.config.panel_spacing_scales * self.distance_from_center
-        return (
-            bottom_left_offset + scales_offset + inter_panel_spacing_offset + 0.5
+        inter_panel_spacing_offset = (
+            self.config.panel_spacing_scales * self.distance_from_center
         )
+        return bottom_left_offset + scales_offset + inter_panel_spacing_offset + 0.5
 
     def set_color(self, color: RGBW) -> None:
         for i in range(self.num_pixels):

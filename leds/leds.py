@@ -448,11 +448,17 @@ def main() -> None:
             debug = True
         else:
             if arg not in list(ConfigMode):
-                print("Please pass a valid config mode. Should be one of", list(map(lambda x: x.value, list(ConfigMode))))
+                print(
+                    "Please pass a valid config mode. Should be one of",
+                    list(map(lambda x: x.value, list(ConfigMode))),
+                )
                 sys.exit(1)
             mode = ConfigMode(arg)
     if not mode:
-        print("Please pass a valid config mode. Should be one of", list(map(lambda x: x.value, list(ConfigMode))))
+        print(
+            "Please pass a valid config mode. Should be one of",
+            list(map(lambda x: x.value, list(ConfigMode))),
+        )
         sys.exit(1)
 
     leds = LEDs(mock, get_config(mode), debug)

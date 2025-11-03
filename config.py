@@ -7,9 +7,11 @@ from leds import controllers
 
 # Unless otherwise specified, all dimensions are in mm
 
+
 class ConfigMode(str, Enum):
     SCALE = "scale"
     HEX = "hex"
+
 
 class BaseConfig(ABC):
     web_port: int = 5001
