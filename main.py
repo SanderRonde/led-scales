@@ -3,11 +3,13 @@ import os
 import sys
 import subprocess
 import venv
+import platform
 import signal
 import threading
 import time
 from pathlib import Path
 from typing import Union, List, TextIO, Literal
+from config import ConfigMode
 
 
 def print_output(pipe: TextIO) -> None:
@@ -130,13 +132,13 @@ def generate_cad(mode: str = "") -> None:
     print("CAD generation complete! Files can be found in the cad/out directory")
 
 
-def run_leds(mock: bool = False, debug: bool = False) -> None:
+def run_leds(mode: ConfigMode, mock: bool = False, debug: bool = False) -> None:
     print("Setting up LED environment...")
     setup_venv("led")
 
     print("Running LED implementation...")
     activate_script = get_venv_activate("led")
-    flags: List[str] = []
+    flags: List[str] = [mode.value]
     if mock:
         flags.append("--mock")
     if debug:
@@ -144,11 +146,58 @@ def run_leds(mock: bool = False, debug: bool = False) -> None:
     flags_str = " ".join(flags)
 
     if sys.platform == "win32":
-        cmd = f'"{activate_script}" && leds {flags_str}'
+        cmd = f'"{activate_script}" && python -m leds.leds {flags_str}'
     else:
-        cmd = f'. "{activate_script}" && leds {flags_str}'
+        cmd = f'. "{activate_script}" && python -m leds.leds {flags_str}'
     run_command(cmd)
 
+def install_leds(mode: ConfigMode) -> None:
+    print("Installing LEDs service")
+
+    if platform.system() != "Linux":
+        print("Only supported on linux")
+        sys.exit(1)
+
+    if os.geteuid() != 0: # type: ignore pylint: disable=no-member
+        print("Run this as root")
+        sys.exit(1)
+
+    service_name = "leds"
+    service_dir = Path("/etc/systemd/system")
+    target_path = service_dir / (service_name + ".service")
+
+    # Read source file
+    source_path = Path("./leds/scripts/leds.service")
+    try:
+        content = source_path.read_text("utf-8")
+    except FileNotFoundError:
+        print(f"Source file {source_path} does not exist.")
+        return
+
+    # Replace {mode} placeholder
+    cwd = str(Path(__file__).parent.resolve())
+    content = content.replace("{mode}", mode)
+    content = content.replace("{cwd}", cwd)
+
+    # Ensure /etc/systemd/system exists
+    service_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write modified service file
+    try:
+        target_path.write_text(content)
+        print(f"Installed service file to {target_path}")
+    except PermissionError:
+        print(f"Permission denied: run with sudo to write to {target_path}")
+        return
+
+    # Print instructions for the user
+    print("\nYou can now manage the service using systemctl:")
+    print("  sudo systemctl daemon-reload")
+    print(f"  sudo systemctl enable {service_name}")
+    print(f"  sudo systemctl start {service_name}")
+    print(f"  sudo systemctl status {service_name}")
+    print(f"  sudo systemctl stop {service_name}")
+    print(f"  sudo systemctl disable {service_name}")
 
 def clean() -> None:
     print("Cleaning up...")
@@ -208,27 +257,42 @@ def configure_led_order() -> None:
 
 def print_help() -> None:
     print("LED Scales CAD Generator:")
-    print("  python main.py setup    - Set up both development environments")
-    print("  python main.py generate - Generate CAD files (default mode)")
-    print("  python main.py 3d       - Generate 3D printable STL files for the scales")
-    print("  python main.py 2d       - Generate 2D SVG files for laser cutting/CNC")
-    print("  python main.py clean    - Clean up generated files and environments")
-    print("  python main.py all      - Generate all needed files")
-    print("  python main.py help     - Show this help message")
-    print("  python main.py leds     - Run the LED implementation")
-    print("  python main.py leds-mock - Run the LED implementation in mock mode")
     print(
-        "  python main.py leds-debug - Run the LED implementation with debug output (FPS)"
+        "  python main.py setup                   - Set up both development environments"
     )
     print(
-        "  python main.py leds-mock-debug - Run the LED implementation in mock mode with debug output"
+        "  python main.py generate                - Generate CAD files (default mode)"
     )
     print(
-        "  python main.py dev      - Run the server in development mode with auto-reload"
+        "  python main.py 3d                      - Generate 3D printable STL files for the scales"
     )
-    print("  python main.py lint     - Run pylint on the codebase")
-    print("  python main.py format   - Format the codebase using Black")
-    print("  python main.py configure-leds - Configure LED ordering for hexagon layout")
+    print(
+        "  python main.py 2d                      - Generate 2D SVG files for laser cutting/CNC"
+    )
+    print(
+        "  python main.py clean                   - Clean up generated files and environments"
+    )
+    print("  python main.py all                     - Generate all needed files")
+    print("  python main.py help                    - Show this help message")
+    print("  python main.py install-leds <mode>     - Install LEDs as systemd service")
+    print("  python main.py leds <mode>             - Run the LED implementation")
+    print(
+        "  python main.py leds-mock <mode>        - Run the LED implementation in mock mode"
+    )
+    print(
+        "  python main.py leds-debug <mode>       - Run the LED implementation with debug output (FPS)"
+    )
+    print(
+        "  python main.py leds-mock-debug <mode>  - Run the LED implementation in mock mode with debug output"
+    )
+    print(
+        "  python main.py dev                     - Run the server in development mode with auto-reload"
+    )
+    print("  python main.py lint                    - Run pylint on the codebase")
+    print("  python main.py format                  - Format the codebase using Black")
+    print(
+        "  python main.py configure-leds          - Configure LED ordering for hexagon layout"
+    )
     print("\nOutput files will be generated in the cad/out directory")
     print("  - 3D files: cad/out/tiles/")
     print("  - 2D files: cad/out/panels/")
@@ -342,6 +406,16 @@ if __name__ == "__main__":
 
     command = sys.argv[1]
 
+    def get_mode() -> ConfigMode:
+        mode = sys.argv[2] if len(sys.argv) > 2 else None
+        if not mode or mode not in list(ConfigMode):
+            print(
+                "Please pass a valid config mode. Should be one of",
+                list(map(lambda x: x.value, list(ConfigMode))),
+            )
+            sys.exit(1)
+        return ConfigMode(mode)
+
     if command == "setup":
         setup_venv("cad")
         setup_venv("led")
@@ -355,14 +429,16 @@ if __name__ == "__main__":
         clean()
     elif command == "help":
         print_help()
+    elif command == "install-leds":
+        install_leds(get_mode())
     elif command == "leds":
-        run_leds()
+        run_leds(get_mode())
     elif command == "leds-mock":
-        run_leds(True)
+        run_leds(get_mode(), True)
     elif command == "leds-debug":
-        run_leds(debug=True)
+        run_leds(get_mode(), debug=True)
     elif command == "leds-mock-debug":
-        run_leds(True, True)
+        run_leds(get_mode(), True, True)
     elif command == "dev":
         dev()  # New development mode with auto-reload
     elif command == "lint":

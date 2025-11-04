@@ -1,4 +1,5 @@
 from leds.effects.effect import (
+    ColorInterpolationParameters,
     Effect,
     SpeedWithDirectionParameters,
     ColorMigration,
@@ -6,7 +7,9 @@ from leds.effects.effect import (
 from leds.controllers.controller_base import ControllerBase
 
 
-class RandomColorSingleParameters(SpeedWithDirectionParameters):
+class RandomColorSingleParameters(
+    SpeedWithDirectionParameters, ColorInterpolationParameters
+):
     pass
 
 

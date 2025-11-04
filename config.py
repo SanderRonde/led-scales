@@ -1,10 +1,16 @@
 from typing import Optional, Union, List, Tuple, Any, Dict
 from pathlib import Path
+from enum import Enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from leds import controllers
 
 # Unless otherwise specified, all dimensions are in mm
+
+
+class ConfigMode(str, Enum):
+    SCALE = "scale"
+    HEX = "hex"
 
 
 class BaseConfig(ABC):
@@ -22,7 +28,7 @@ class ScaleConfig(BaseConfig):
     web_port: int = 5001
     # A tuple of (pin, channel) per panel
     pins: List[Tuple[int, int]] = field(
-        default_factory=lambda: [(13, 1), (19, 1), (26, 2)]
+        default_factory=lambda: [(13, 1), (12, 0), (21, 0)]
     )
 
     # Scale dimensions
@@ -37,7 +43,7 @@ class ScaleConfig(BaseConfig):
 
     # Panel layout
     spacing: int = 55  # Spacing between scales
-    panel_spacing_scales: int = 1  # Spacing between panels
+    panel_spacing_scales: int = 3  # Spacing between panels in scales
     x_count: int = 6
     y_count: int = 12
     panel_count: int = 3
@@ -97,9 +103,13 @@ class ScaleConfig(BaseConfig):
         return self.y_print_bed - (self.print_outside_padding * 2)
 
     @property
+    def space_between_panels(self) -> float:
+        return self.spacing * self.panel_spacing_scales
+
+    @property
     def total_width(self) -> float:
         return self.panel_width * self.panel_count + (
-            self.spacing * (self.panel_count - 1)
+            (self.space_between_panels) * (self.panel_count - 1)
         )
 
     @property
@@ -188,21 +198,22 @@ class HexConfig(BaseConfig):
     pins: Tuple[int, int] = (13, 1)
 
 
-# Change this to choose the config you want
-_config = HexConfig()
-# _config = ScaleConfig()
+def get_config(mode: ConfigMode) -> BaseConfig:
+    if mode == ConfigMode.HEX:
+        config = HexConfig()
+    elif mode == ConfigMode.SCALE:
+        config = ScaleConfig()
+    else:
+        raise ValueError("Unknown mode")
 
-# Always validate the config
-_config.validate()
+    # Always validate the config
+    config.validate()
+    return config
 
 
-def get_config() -> BaseConfig:
-    return _config
-
-
-def get_led_controller(mock: bool) -> controllers.ControllerBase:
-    if isinstance(_config, ScaleConfig):  # type: ignore
-        return controllers.ScalePanelLEDController(_config, mock)
-    if isinstance(_config, HexConfig):  # type: ignore
-        return controllers.HexPanelLEDController(_config, mock)
-    raise ValueError(f"Unknown config type: {type(_config)}")
+def get_led_controller(config: BaseConfig, mock: bool) -> controllers.ControllerBase:
+    if isinstance(config, ScaleConfig):  # type: ignore
+        return controllers.ScalePanelLEDController(config, mock)
+    if isinstance(config, HexConfig):  # type: ignore
+        return controllers.HexPanelLEDController(config, mock)
+    raise ValueError(f"Unknown config type: {type(config)}")

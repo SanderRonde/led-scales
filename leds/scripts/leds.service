@@ -1,0 +1,13 @@
+
+
+[Unit]
+Description=LEDs
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/usr/bin/python {cwd}/main.py leds {mode}
+WorkingDirectory={cwd}
+
+[Install]
+WantedBy=multi-user.target

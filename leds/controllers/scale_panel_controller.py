@@ -34,13 +34,12 @@ class LEDPanel:
         return self.index - center_panel
 
     def get_base_x(self) -> float:
-        distance_from_center = self.distance_from_center
-        scale_offset = (
-            (distance_from_center - 0.5) * self.config.x_count
-            + (self.config.panel_spacing_scales * abs(distance_from_center))
-            + 0.5
+        bottom_left_offset = -0.5 * self.config.x_count
+        scales_offset = self.config.x_count * self.distance_from_center
+        inter_panel_spacing_offset = (
+            self.config.panel_spacing_scales * self.distance_from_center
         )
-        return scale_offset
+        return bottom_left_offset + scales_offset + inter_panel_spacing_offset + 0.5
 
     def set_color(self, color: RGBW) -> None:
         for i in range(self.num_pixels):
@@ -96,7 +95,12 @@ class ScalePanelLEDController(ControllerBase):
                     self.panels[panel_index].strip.setPixelColor(led_index, color)
 
     def get_coordinates(self, strip_index: int, led_index: int) -> Tuple[float, float]:
-        raise NotImplementedError("Coordinates not implemented for scale panels")
+        for absolute_x, absolute_y, indices in self.cached_coordinates[strip_index]:
+            if indices == (strip_index, led_index):
+                return absolute_x, absolute_y
+        raise ValueError(
+            f"Coordinates not found for panel {strip_index} and led {led_index}"
+        )
 
     def get_strips(self) -> List["MockPixelStrip"]:
         return [panel.strip for panel in self.panels]
@@ -108,7 +112,7 @@ class ScalePanelLEDController(ControllerBase):
             "y_count": self.config.y_count,
             "panel_count": self.config.panel_count,
             "spacing": self.config.spacing,
-            "panel_spacing_scales": self.config.panel_spacing_scales,
+            "space_between_panels": self.config.space_between_panels,
             "total_width": self.config.total_width,
             "total_height": self.config.total_height,
             "scale_length": self.config.base_length,

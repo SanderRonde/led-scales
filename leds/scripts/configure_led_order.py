@@ -15,21 +15,20 @@ Usage:
 """
 
 import sys
-import time
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 from pathlib import Path
 
 # Add parent directories to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from config import HexConfig, get_config, BaseConfig
+from config import HexConfig, get_config, ConfigMode
 from leds.color import RGBW
 from leds.controllers.controller_base import get_library
 
 
 class LEDOrderConfigurator:
     def __init__(self):
-        self.config = get_config()
+        self.config = get_config(ConfigMode.HEX)
         if not isinstance(self.config, HexConfig):
             raise ValueError("This script is designed for HexConfig only")
 

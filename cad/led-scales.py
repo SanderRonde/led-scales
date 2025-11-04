@@ -2,6 +2,7 @@
 # pyright: reportUnknownVariableType=false
 # pyright: reportUnknownParameterType=false
 # pyright: reportPrivateUsage=false
+# pylint: disable=duplicate-code
 
 # To auto watch and run:
 # bun x nodemon --exec "python cad/led-scales.py" --watch "cad/led-scales.py"
@@ -507,6 +508,7 @@ diffusers(os.path.join(diffuser_dir, "diffuser"))
 print("Panel dimensions are ", config.panel_width, "x", config.panel_height, flush=True)
 print("Panel count is ", config.panel_count, flush=True)
 print("Total dimensions are ", config.total_width, "x", config.total_height, flush=True)
+print("Space between panels is ", config.space_between_panels, flush=True)
 print("Square meters are ", config.total_area_m2, flush=True)
 print("Scale count is ", config.get_led_count(), flush=True)
 print("Estimated weight is ", config.total_weight_kg, "kg", flush=True)

@@ -1,4 +1,10 @@
+import sys
 from typing import List, Dict
+from pathlib import Path
+
+# Add parent directories to path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 from config import HexConfig
 from leds.color import RGBW
 from leds.controllers.controller_base import get_library
