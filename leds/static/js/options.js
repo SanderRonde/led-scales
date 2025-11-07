@@ -179,6 +179,13 @@ function createColorListInput(param, paramName) {
     const container = document.createElement("div");
     container.className = "color-list-input";
 
+    const updateCounts = () => {
+        const colorList = container.querySelectorAll(".color-item input");
+        colorList.forEach((color, index) => {
+            color.dataset.param = `${paramName}[${index}]`;
+        });
+    };
+
     const colors = param.value || param.default || [];
     colors.forEach((color, index) => {
         const colorContainer = document.createElement("div");
@@ -191,7 +198,10 @@ function createColorListInput(param, paramName) {
 
         const removeBtn = document.createElement("button");
         removeBtn.textContent = "×";
-        removeBtn.onclick = () => colorContainer.remove();
+        removeBtn.onclick = () => {
+            colorContainer.remove();
+            updateCounts();
+        };
 
         colorContainer.appendChild(input);
         colorContainer.appendChild(removeBtn);
@@ -207,9 +217,6 @@ function createColorListInput(param, paramName) {
         const input = document.createElement("input");
         input.type = "color";
         input.value = "#000000";
-        const currentColorCount =
-            container.querySelectorAll(".color-item").length;
-        input.dataset.param = `${paramName}[${currentColorCount}]`;
 
         const removeBtn = document.createElement("button");
         removeBtn.textContent = "×";
@@ -217,10 +224,13 @@ function createColorListInput(param, paramName) {
 
         colorContainer.appendChild(input);
         colorContainer.appendChild(removeBtn);
-        container.appendChild(colorContainer);
+        container.insertBefore(colorContainer, addBtn);
+
+        updateCounts();
     };
 
     container.appendChild(addBtn);
+    updateCounts();
     return container;
 }
 
@@ -284,10 +294,7 @@ applyButton.addEventListener("click", async () => {
     await applyEffect();
 });
 
-export async function applyEffect() {
-    const effectName = effectSelect.value;
-    if (!effectName) return;
-
+export function getParameters() {
     const parameters = {};
     document
         .querySelectorAll("#parameters input, #parameters select")
@@ -313,6 +320,14 @@ export async function applyEffect() {
                 }
             }
         });
+    return parameters;
+}
+
+export async function applyEffect() {
+    const effectName = effectSelect.value;
+    if (!effectName) return;
+
+    const parameters = getParameters();
 
     try {
         const response = await fetch("/effects", {

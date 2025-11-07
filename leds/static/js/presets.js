@@ -1,4 +1,8 @@
-import { applyEffect, updateBrightnessSliderState } from "./options.js";
+import {
+    applyEffect,
+    getParameters,
+    updateBrightnessSliderState,
+} from "./options.js";
 
 /**
  * @typedef {Object} Preset
@@ -98,14 +102,7 @@ class PresetManager {
      * @returns {Object} Parameter values keyed by input ID
      */
     getCurrentParameters() {
-        const parameters = {};
-        const parameterInputs = document.querySelectorAll(
-            "#parameters input, #parameters select"
-        );
-        parameterInputs.forEach((input) => {
-            parameters[input.getAttribute("data-param")] = input.value;
-        });
-        return parameters;
+        return getParameters();
     }
 
     /**
