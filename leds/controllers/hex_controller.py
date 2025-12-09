@@ -53,7 +53,7 @@ class HexPanel:
         fraction = index / total_leds
 
         # Convert to degrees
-        return ((-fraction * 360) + 360 + 180) % 360
+        return ((-fraction * 360) + 360 + 180 - 30) % 360
 
     def get_x_y_at_index(self, index: int) -> Tuple[float, float]:
         angle = self.get_angle_at_index(index)
