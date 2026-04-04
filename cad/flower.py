@@ -7,9 +7,8 @@
 import os
 import re
 import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, List, Optional
 
 import solid as s
 
@@ -22,86 +21,46 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SHOW_BEZIER_DEBUG = True
 PETAL_X = 12
 
-BOSL2 = s.import_scad("BOSL2")
+beziers = s.import_scad("BOSL2/beziers.scad")
+lists = s.import_scad("BOSL2/lists.scad")
 
 
-@dataclass(frozen=True)
-class BezierKnot:
-    """One vertex on a cubic Bézier chain (Inkscape-style handles).
-
-    Segment from knot i to i+1 uses:
-      P0 = knot[i].xy, P1 = knot[i].xy + knot[i].out_tangent,
-      P2 = knot[i+1].xy + knot[i+1].in_tangent, P3 = knot[i+1].xy
-
-    First knot: ``in_tangent`` is ignored. Last knot: ``out_tangent`` is ignored.
-    """
-
-    xy: Tuple[float, float]
-    out_tangent: Tuple[float, float] = (0.0, 0.0)
-    in_tangent: Tuple[float, float] = (0.0, 0.0)
+def half_petal_outer_bezpath() -> List[Any]:
+    """Closed-form cubic bezpath via BOSL2 ``bez_begin`` / ``bez_joint`` / ``bez_end``."""
+    return lists.flatten(
+        [
+            beziers.bez_begin([0, 0], [0, 0]),
+            beziers.bez_joint([-12, 50], [0, -20], [0, 20]),
+            beziers.bez_joint([0, 80], [-4, -4], [4, 4]),
+            beziers.bez_end([PETAL_X, 84], [0, 0]),
+        ]
+    )
 
 
-def knots_to_bezpath(knots: Sequence[BezierKnot]) -> List[List[float]]:
-    """Flatten knots to a BOSL2 cubic (N=3) bezier path: len % 3 == 1."""
-    if len(knots) < 2:
-        return []
-
-    flat: List[List[float]] = []
-    for i in range(len(knots) - 1):
-        p0 = knots[i].xy
-        p1 = (p0[0] + knots[i].out_tangent[0], p0[1] + knots[i].out_tangent[1])
-        p3 = knots[i + 1].xy
-        p2 = (
-            p3[0] + knots[i + 1].in_tangent[0],
-            p3[1] + knots[i + 1].in_tangent[1],
-        )
-        if i == 0:
-            flat.extend(
-                [
-                    [p0[0], p0[1]],
-                    [p1[0], p1[1]],
-                    [p2[0], p2[1]],
-                    [p3[0], p3[1]],
-                ]
-            )
-        else:
-            flat.extend(
-                [
-                    [p1[0], p1[1]],
-                    [p2[0], p2[1]],
-                    [p3[0], p3[1]],
-                ]
-            )
-    return flat
+def half_petal_inner_bezpath() -> List[Any]:
+    return lists.flatten(
+        [
+            beziers.bez_begin([PETAL_X, 76], [5, 0]),
+            beziers.bez_joint([2, 72], [5, 5], [-5, -5]),
+            beziers.bez_joint([-6, 50], [0, 10], [0, -10]),
+            beziers.bez_end([5, 0], [-5, 10]),
+        ]
+    )
 
 
 def create_half_flower_petal(
     bezier_samples: int = 24,
     debug: Optional[bool] = None,
 ):
-    """2D half-petal outline via BOSL2 ``bezpath_curve``; tune knot tuples below."""
+    """2D half-petal outline via BOSL2 ``bezpath_curve``; tune ``*_bezpath()`` helpers below."""
     show_handles = SHOW_BEZIER_DEBUG if debug is None else debug
 
-    outer_knots: Tuple[BezierKnot, ...] = (
-        BezierKnot((0, 0), out_tangent=(0, 0), in_tangent=(0, 0)),
-        BezierKnot((-12, 50), out_tangent=(0, 20), in_tangent=(0, -20)),
-        BezierKnot((0, 80), out_tangent=(4, 4), in_tangent=(-4, -4)),
-        BezierKnot((PETAL_X, 84), out_tangent=(0, 0), in_tangent=(0, 0)),
-    )
+    outer_bezpath = half_petal_outer_bezpath()
+    inner_bezpath = half_petal_inner_bezpath()
 
-    inner_knots: Tuple[BezierKnot, ...] = (
-        BezierKnot((PETAL_X, 76), out_tangent=(5, 0), in_tangent=(-5, 0)),
-        BezierKnot((2, 72), out_tangent=(-5, -5), in_tangent=(5, 5)),
-        BezierKnot((-6, 50), out_tangent=(0, -10), in_tangent=(0, 10)),
-        BezierKnot((5, 0), out_tangent=(0, 0), in_tangent=(-5, 10)),
-    )
-
-    outer_bezpath = knots_to_bezpath(outer_knots)
-    inner_bezpath = knots_to_bezpath(inner_knots)
-
-    outer_curve = BOSL2.beziers.bezpath_curve(outer_bezpath, splinesteps=bezier_samples)
-    inner_curve = BOSL2.beziers.bezpath_curve(inner_bezpath, splinesteps=bezier_samples)
-    pts = BOSL2.lists.flatten([outer_curve, inner_curve])
+    outer_curve = beziers.bezpath_curve(outer_bezpath, splinesteps=bezier_samples)
+    inner_curve = beziers.bezpath_curve(inner_bezpath, splinesteps=bezier_samples)
+    pts = lists.flatten([outer_curve, inner_curve])
 
     poly = s.polygon(pts)
     if not show_handles:
@@ -109,8 +68,8 @@ def create_half_flower_petal(
 
     w = 0.5
     dbg = (
-        BOSL2.beziers.debug_bezier(outer_bezpath, width=w, N=3)()
-        + BOSL2.beziers.debug_bezier(inner_bezpath, width=w, N=3)()
+        beziers.debug_bezier(outer_bezpath, width=w, N=3)()
+        + beziers.debug_bezier(inner_bezpath, width=w, N=3)()
     )
     return poly + dbg
 
