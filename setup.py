@@ -33,9 +33,11 @@ PACKAGE_CONFIG: Dict[str, Any] = {
         ],
         "cad": [
             "pylint",
+            "setuptools<82",  # solid-python imports pkg_resources (removed in setuptools 82+)
             "numpy",  # Required for CAD generation
             "openpyscad",  # Required for CAD generation
             "scipy",  # Required for CAD generation
+            "solidpython",  # Required for CAD generation
         ],
     },
 }
