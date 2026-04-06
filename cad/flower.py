@@ -8,7 +8,6 @@ import math
 import os
 import re
 from dataclasses import dataclass
-from enum import Enum
 import sys
 from pathlib import Path
 from typing import Iterator, List
@@ -27,13 +26,13 @@ Y0_CONTACT_EXTRUDE_DEPTH = 10
 PETAL_HEIGHT_MIN = 76
 PETAL_HEIGHT_MAX = 84
 RESOLUTION_DEBUG = 24
-RESOLUTION_DETAILED = 360
+RESOLUTION_DETAILED = 50
 # Sweep profile density: path_sweep2d cost scales with this × sweep segments; keep debug low.
 SPLINE_STEPS_DEBUG = 4
 SPLINE_STEPS_PRINT = 24
 
 # Flower layout (tune): concentric rings around origin in XY, petals face the center.
-NUM_RINGS = 5
+NUM_RINGS = 1
 MIN_SCALE = 0.5
 INNER_RING_RADIUS = 32.0
 RING_SPACING = 20.0
@@ -45,14 +44,6 @@ PETAL_ROTATE = 45.0
 
 OPENSCAD_PATH = '/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD'
 
-class DebugLevel(Enum):
-    SHAPES_ONLY = "shapes_only"
-    DEBUG = "debug"
-    PRINT = "print"
-
-    def file_name(self) -> str:
-        return "flower-" + self.value
-
 beziers = s.import_scad("BOSL2/beziers.scad")
 lists = s.import_scad("BOSL2/lists.scad")
 skin = s.import_scad("BOSL2/skin.scad")
@@ -60,7 +51,7 @@ transforms = s.import_scad("BOSL2/transforms.scad")
 drawing = s.import_scad("BOSL2/drawing.scad")
 
 
-def generate_petal(debug: DebugLevel) -> s.OpenSCADObject:
+def generate_petal(debug: bool) -> s.OpenSCADObject:
     outer_bezpath = lists.flatten(
         [
             beziers.bez_begin([0, 0], [0, 0]),
@@ -77,9 +68,8 @@ def generate_petal(debug: DebugLevel) -> s.OpenSCADObject:
             beziers.bez_end([5, 0], [-5, 10]),
         ]
     )
-    splines = SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT
-    outer_curve = beziers.bezpath_curve(outer_bezpath, splinesteps=splines)
-    inner_curve = beziers.bezpath_curve(inner_bezpath, splinesteps=splines)
+    outer_curve = beziers.bezpath_curve(outer_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
+    inner_curve = beziers.bezpath_curve(inner_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
 
     # ``flatten([outer, inner])`` plus ``move`` centers the full petal like mirroring the half.
     petal_shape = transforms.move(
@@ -92,55 +82,39 @@ def generate_petal(debug: DebugLevel) -> s.OpenSCADObject:
     petal = skin.path_sweep2d(petal_shape, sweep_path)
 
     # Debug skips the base extension: it duplicates path_sweep2d and projection(cut) is very slow.
-    if debug != DebugLevel.PRINT:
-        extension = s.projection(cut=True)(petal)
-        extension = s.linear_extrude(height=10, convexity=4)(extension)
-        extension = s.mirror((0, 0, 1))(extension)
-        petal = s.union()(petal, extension)
+    extension = s.projection(cut=True)(petal)
+    extension = s.linear_extrude(height=10, convexity=4)(extension)
+    extension = s.mirror((0, 0, 1))(extension)
+    petal = s.union()(petal, extension)
 
     # Rotate a bit and translate to match
     petal = s.translate((0, 0, 9))(s.rotate((-PETAL_ROTATE, 0, 0))(petal))
     return petal
 
-def generate_half_cylinder() -> s.OpenSCADObject:
-     # Make a simple half cylinder for SHAPES_ONLY debug
-    # Parameters are chosen to somewhat match petal base
-    radius = 13
-    height = 84
-    wall = 2.0
-    inner_r = radius - wall
-    hollow = s.difference()(
-        s.cylinder(r=radius, h=height, center=False),
-        s.translate((0, 0, -0.01))(
-            s.cylinder(r=inner_r, h=height + 0.02, center=False)
-        ),
-    )
-    # Half: keep y >= 0 (semicircular tube in XY)
-    petal = s.intersection()(
-        hollow,
-        s.translate((-radius - 1, 0, -1))(
-            s.cube((2 * radius + 2, radius + 1, height + 2))
-        ),
-    )
-    return s.rotate((-PETAL_ROTATE, 0, 0))(petal)
+def single_petal_geometry(debug: bool) -> s.OpenSCADObject:
+    """One petal in canonical pose (same mesh exported to ``{petal_file_name()}.stl``)."""
+    return generate_petal(debug)
 
-def _placed_petal_on_ring(
-    debug: DebugLevel, angle_deg: float, scale: float, ring_radius: float
-) -> s.OpenSCADObject:
-    """One petal on a ring at polar angle ``angle_deg`` (degrees), tip toward origin."""
-    petal: s.OpenSCADObject
-    if debug != DebugLevel.SHAPES_ONLY:
-        petal = generate_petal(debug)
-    else:
-        petal = generate_half_cylinder()
-    petal = s.scale((scale, scale, scale))(petal)
 
-    # Child order (innermost first): petal → face center → move to ring → orbit around Z.
-    return s.rotate((0, 0, angle_deg))(
-        s.translate((ring_radius, 0, 0))(
-            s.rotate((0, 0, FACE_CENTER_Z_DEG))(petal)
-        )
+def generate_flower_assembly_scad(file_name: str) -> str:
+    """Union of ``import(petal.stl)`` with ring placement — fast preview/render vs full CSG."""
+    stl_name = f"{file_name}.stl"
+    header = (
+        f"// Requires {stl_name} in this directory (export from {file_name}.scad).\n\n"
     )
+    parts: List[str] = []
+    for lay in iter_ring_layouts():
+        stagger = lay.angle_per_petal / 2.0 if lay.ring % 2 == 0 else 0.0
+        for i in range(lay.n_petals):
+            angle_deg = lay.angle_per_petal * i + stagger
+            parts.append(
+                f"""  rotate([0, 0, {angle_deg:g}])
+  translate([{lay.ring_radius:g}, 0, 0])
+  rotate([0, 0, {FACE_CENTER_Z_DEG:g}])
+  scale([{lay.scale:g}, {lay.scale:g}, {lay.scale:g}])
+  import("{stl_name}");"""
+            )
+    return header + "union() {\n" + "\n".join(parts) + "\n}\n"
 
 
 @dataclass(frozen=True)
@@ -153,7 +127,7 @@ class RingLayout:
 
 
 def iter_ring_layouts() -> Iterator[RingLayout]:
-    """Ring radius, scale, and petal count — single source for layout print and ``generate_flower``."""
+    """Ring radius, scale, and petal count — single source for layout and assembly SCAD."""
     if NUM_RINGS <= 0:
         return
     scale_step = (1.0 - MIN_SCALE) / (NUM_RINGS - 1) if NUM_RINGS > 1 else 0.0
@@ -189,17 +163,6 @@ def _print_flower_layout() -> None:
     print(f"  total petals (all rings): {total_petals}")
 
 
-def generate_flower(debug: DebugLevel) -> s.OpenSCADObject:
-    petals: List[s.OpenSCADObject] = []
-    for lay in iter_ring_layouts():
-        stagger = lay.angle_per_petal / 2.0 if lay.ring % 2 == 0 else 0.0
-        for i in range(lay.n_petals):
-            angle_deg = lay.angle_per_petal * i + stagger
-            petals.append(
-                _placed_petal_on_ring(debug, angle_deg, lay.scale, lay.ring_radius)
-            )
-    return s.union()(*petals)
-
 def fix_import(scad: str) -> str:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     std = os.path.abspath(os.path.join(root, "BOSL2", "std.scad"))
@@ -222,7 +185,14 @@ def write_to_file(filename: str, content: s.OpenSCADObject) -> None:
         os.makedirs(out_dir)
     Path(os.path.join(out_dir, filename + ".scad")).write_text(fix_import(s.scad_render(content)))
 
-def to_stl(file_name: str):
+
+def write_raw_scad(filename: str, body: str) -> None:
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    Path(os.path.join(out_dir, filename + ".scad")).write_text(body)
+
+
+def to_stl(file_name: str) -> None:
     file_path = os.path.join(out_dir, f"{file_name}.scad")
     subprocess.run(
         [OPENSCAD_PATH, "-o", os.path.join(out_dir, f"{file_name}.stl"), file_path],
@@ -231,11 +201,20 @@ def to_stl(file_name: str):
         check=False,
     )
 
+
 _print_flower_layout()
-for debug_level in DebugLevel:
-    write_to_file(debug_level.file_name(), generate_flower(debug_level))
-    print(f"Wrote cad/out/{debug_level.file_name()}.scad")
+
+for debug in [True, False]:
+    postfix = "-debug" if debug else ""
+    single_petal_file_name = "single-petal" + postfix
+    write_to_file(single_petal_file_name, single_petal_geometry(debug))
+    print(f"Wrote cad/out/{single_petal_file_name}.scad")
+    flower_assembly_file_name = "flower-assembly" + postfix
+    write_raw_scad(flower_assembly_file_name, generate_flower_assembly_scad(single_petal_file_name))
+    print(f"Wrote cad/out/{flower_assembly_file_name}.scad (imports {single_petal_file_name}.stl)")
     if "--3d" in sys.argv:
-        to_stl(debug_level.file_name())
-        print(f"Wrote cad/out/{debug_level.file_name()}.stl")
+        to_stl(single_petal_file_name)
+        print(f"Wrote cad/out/{single_petal_file_name}.stl")
+        to_stl(flower_assembly_file_name)
+        print(f"Wrote cad/out/{flower_assembly_file_name}.stl")
 print("Done!")
