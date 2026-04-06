@@ -32,7 +32,7 @@ SPLINE_STEPS_PRINT = 24
 NUM_RINGS = 5
 MIN_SCALE = 0.5
 INNER_RING_RADIUS = 35.0
-RING_SPACING_MAX = 40.0
+RING_SPACING_DELTA = 40.0
 # Target arc length along each ring per petal — smaller ⇒ more petals on that ring.
 PETAL_ARC_MM = 50.0
 # Extra Z rotation so petal local “forward” points radially inward after placement.
@@ -138,7 +138,7 @@ def iter_ring_layouts() -> Iterator[RingLayout]:
     ring_radius = INNER_RING_RADIUS
     for ring in range(NUM_RINGS):
         scale = MIN_SCALE + ring * scale_step
-        ring_radius += RING_SPACING_MAX * scale
+        ring_radius += RING_SPACING_DELTA * scale
         circumference = 2 * math.pi * ring_radius
         n_petals = max(3, int((circumference / PETAL_ARC_MM) * (1.0 / scale)))
         yield RingLayout(
@@ -155,7 +155,7 @@ def _print_flower_layout() -> None:
     print("Flower layout:")
     print(
         f"  NUM_RINGS={NUM_RINGS}, INNER_RING_RADIUS={INNER_RING_RADIUS}, "
-        f"RING_SPACING_MAX={RING_SPACING_MAX}, PETAL_ARC_MM={PETAL_ARC_MM}, MIN_SCALE={MIN_SCALE}"
+        f"RING_SPACING_MAX={RING_SPACING_DELTA}, PETAL_ARC_MM={PETAL_ARC_MM}, MIN_SCALE={MIN_SCALE}"
     )
     total_petals = 0
     for lay in iter_ring_layouts():
