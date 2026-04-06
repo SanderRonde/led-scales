@@ -185,10 +185,14 @@ def fix_import(scad: str) -> str:
 current_dir = os.path.dirname(os.path.abspath(__file__))
 out_dir = os.path.join(current_dir, "out")
 
-def write_to_file(filename: str, content: s.OpenSCADObject) -> None:
+def write_to_file(filename: str, content: s.OpenSCADObject, file_type: str) -> str:
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-    Path(os.path.join(out_dir, filename + ".scad")).write_text(fix_import(s.scad_render(content)))
+    scad_path = os.path.join(out_dir, filename + ".scad")
+    Path(scad_path).write_text(fix_import(s.scad_render(content)))
+    if "--3d" in sys.argv:
+        return to_3d(scad_path, f"{filename}.{file_type}")
+    return "2d-only"
 
 
 def write_raw_scad(filename: str, body: str) -> None:
@@ -232,29 +236,23 @@ def _save_3d_cache(cache: Dict[str, str]) -> None:
     )
 
 
-def to_3d(file_name: str, file_type: str) -> str:
-    f"""Export ``{file_name}.{file_type}`` via OpenSCAD if missing or ``{file_name}.scad`` changed.
-
-    Returns a short status for logging: ``"wrote"`` or ``"skipped"``.
-    """
-    scad_path = os.path.join(out_dir, f"{file_name}.scad")
-    full_path = os.path.join(out_dir, f"{file_name}.{file_type}")
+def to_3d(scad_path: str, three_d_path: str) -> str:
     if not os.path.isfile(scad_path):
         return "missing_scad"
 
     scad_hash = _scad_sha256(scad_path)
     cache = _load_3d_cache()
-    if os.path.isfile(full_path) and cache.get(file_name) == scad_hash:
+    if os.path.isfile(three_d_path) and cache.get(three_d_path) == scad_hash:
         return "skipped"
 
     result = subprocess.run(
-        [OPENSCAD_PATH, "-o", full_path, scad_path],
+        [OPENSCAD_PATH, "-o", three_d_path, scad_path],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
     )
-    if result.returncode == 0 and os.path.isfile(full_path):
-        cache[file_name] = scad_hash
+    if result.returncode == 0 and os.path.isfile(three_d_path):
+        cache[three_d_path] = scad_hash
         _save_3d_cache(cache)
         return "wrote"
     return "failed"
@@ -268,14 +266,15 @@ if "--prod" in sys.argv:
 for debug in variants:
     postfix = "-debug" if debug else ""
     single_petal_file_name = "single-petal" + postfix
-    write_to_file(single_petal_file_name, generate_petal(debug))
-    print(f"Wrote cad/out/{single_petal_file_name}.scad")
+    status = write_to_file(single_petal_file_name, generate_petal(debug), "stl")
+    print(f"Wrote cad/out/{single_petal_file_name}.scad status: {status}")
+
     flower_assembly_file_name = "flower-assembly" + postfix
     write_raw_scad(flower_assembly_file_name, generate_flower_assembly_scad(single_petal_file_name))
     print(f"Wrote cad/out/{flower_assembly_file_name}.scad (imports {single_petal_file_name}.stl)")
-    if "--3d" in sys.argv:
-        single_petal_status = to_3d(single_petal_file_name, "stl")
-        print(f"Single petal status: {single_petal_status}")
-        flower_assembly_status = to_3d(flower_assembly_file_name, "3mf")
-        print(f"Flower assembly status: {flower_assembly_status}")
+
+    for lay in iter_ring_layouts():
+        scaled_petal = s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
+        status = write_to_file(f"scaled-petal-{lay.ring}", scaled_petal, "3mf")
+        print(f"Wrote cad/out/scaled-petal-{lay.ring}.scad status: {status}. Print {lay.n_petals} times")
 print("Done!")
