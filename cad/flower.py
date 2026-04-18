@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 import subprocess
 import solid as s
 
@@ -424,7 +424,7 @@ def write_to_file(
     folder: str,
     file_name: str,
     content: s.OpenSCADObject,
-    three_d_file_type: Optional[str],
+    three_d_file_type: Optional[Literal["3mf", "stl"]],
 ) -> None:
     folder_path = os.path.join(out_dir, folder)
     if not os.path.exists(folder_path):
@@ -522,7 +522,7 @@ def main():
             folder,
             "flower-center",
             generate_center(debug),
-            None,
+            "3mf",
         )
 
         # Ring petals
