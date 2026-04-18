@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 import sys
 from pathlib import Path
-from typing import Dict, Iterator, List
+from typing import Dict, List, Optional
 import subprocess
 import solid as s
 
@@ -39,6 +39,7 @@ PETAL_ARC_MM = 45.0
 FACE_CENTER_Z_DEG = 300.0
 PETAL_ROTATE = 50.0
 EST_WEIGHT_G = 21
+PETAL_BASE_RADIUS = 7
 
 OPENSCAD_PATH = (
     "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD"
@@ -51,6 +52,18 @@ lists = s.import_scad("BOSL2/lists.scad")
 skin = s.import_scad("BOSL2/skin.scad")
 transforms = s.import_scad("BOSL2/transforms.scad")
 drawing = s.import_scad("BOSL2/drawing.scad")
+
+
+def generate_petal_base_pins() -> s.OpenSCADObject:
+    pin = s.translate((6, 0, -10))(s.cylinder(r=1, h=10, segments=100))
+    return pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
+
+
+def generate_petal_base() -> s.OpenSCADObject:
+    return (
+        s.translate((0, 0, -1))(s.cylinder(r=PETAL_BASE_RADIUS, h=1, segments=100))
+        + generate_petal_base_pins()
+    )
 
 
 def generate_petal(debug: bool) -> s.OpenSCADObject:
@@ -103,35 +116,41 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
 
     # Remove the XZ plane
     cube = s.translate((0, 0, -50))(s.cube([100, 100, 100], center=True))
-    petal = petal - cube
 
-    # Add a base
-    base = s.translate((0, 0, -1))(s.cylinder(r=16, h=1, segments=100))
-    pin = s.translate((14, 0, -10))(s.cylinder(r=2, h=10, segments=100))
-    base = base + pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
-
-    return (petal - cube) + base
+    return petal - cube
 
 
-def generate_flower_assembly_scad(file_name: str) -> str:
-    """Union of ``import(petal.stl)`` with ring placement — fast preview/render vs full CSG."""
-    stl_name = f"{file_name}.stl"
-    header = (
-        f"// Requires {stl_name} in this directory (export from {file_name}.scad).\n\n"
-    )
-    parts: List[str] = []
+def get_center_radius() -> float:
+    center_layer = iter_ring_layouts()[0]
+    return center_layer.ring_radius - PETAL_BASE_RADIUS - 1
+
+
+def generate_flower_assembly(
+    flower: Optional[s.OpenSCADObject], base: s.OpenSCADObject
+) -> s.OpenSCADObject:
+    obj = s.union()
     for lay in iter_ring_layouts():
         stagger = lay.angle_per_petal / 2.0 if lay.ring % 2 == 0 else 0.0
         for i in range(lay.n_petals):
             angle_deg = lay.angle_per_petal * i + stagger
-            parts.append(
-                f"""  rotate([0, 0, {angle_deg:g}])
-  translate([{lay.ring_radius:g}, 0, 0])
-  rotate([0, 0, {FACE_CENTER_Z_DEG:g}])
-  scale([{lay.scale:g}, {lay.scale:g}, {lay.scale:g}])
-  import("{stl_name}");"""
+            scaled_obj = base
+            if flower:
+                scaled_obj = scaled_obj + s.scale((lay.scale, lay.scale, lay.scale))(
+                    flower
+                )
+            obj = obj + (
+                s.rotate((0, 0, angle_deg))(
+                    s.translate((lay.ring_radius, 0, 0))(
+                        s.rotate((0, 0, FACE_CENTER_Z_DEG))(scaled_obj)
+                    )
+                )
             )
-    return header + "union() {\n" + "\n".join(parts) + "\n}\n"
+
+    return obj
+
+
+def generate_center() -> s.OpenSCADObject:
+    return s.cylinder(get_center_radius(), 1)
 
 
 @dataclass(frozen=True)
@@ -143,33 +162,32 @@ class RingLayout:
     angle_per_petal: float
 
 
-def iter_ring_layouts() -> Iterator[RingLayout]:
+def iter_ring_layouts() -> List[RingLayout]:
     """Ring radius, scale, and petal count — single source for layout and assembly SCAD."""
-    if NUM_RINGS <= 0:
-        return
     scale_step = (1.0 - MIN_SCALE) / (NUM_RINGS - 1) if NUM_RINGS > 1 else 0.0
     ring_radius = INNER_RING_RADIUS
+    ring_layouts = []
     for ring in range(NUM_RINGS):
         scale = MIN_SCALE + ring * scale_step
         ring_radius += RING_SPACING_DELTA * scale
         circumference = 2 * math.pi * ring_radius
         n_petals = max(3, int((circumference / PETAL_ARC_MM) * (1.0 / scale)))
-        yield RingLayout(
-            ring=ring,
-            ring_radius=ring_radius,
-            scale=scale,
-            n_petals=n_petals,
-            angle_per_petal=360.0 / n_petals,
+        ring_layouts.append(
+            RingLayout(
+                ring=ring,
+                ring_radius=ring_radius,
+                scale=scale,
+                n_petals=n_petals,
+                angle_per_petal=360.0 / n_petals,
+            )
         )
+    return ring_layouts
 
 
-def _print_flower_layout() -> None:
+def print_flower_layout() -> None:
     """Log ring radii, petals per ring, and totals (same math as ``generate_flower``)."""
     print("Flower layout:")
-    print(
-        f"  NUM_RINGS={NUM_RINGS}, INNER_RING_RADIUS={INNER_RING_RADIUS}, "
-        f"RING_SPACING_MAX={RING_SPACING_DELTA}, PETAL_ARC_MM={PETAL_ARC_MM}, MIN_SCALE={MIN_SCALE}"
-    )
+    print(f"  num rings:{NUM_RINGS}\n  center radius:{get_center_radius()}")
     total_petals = 0
     total_weight_g = 0
     for lay in iter_ring_layouts():
@@ -203,20 +221,22 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 out_dir = os.path.join(current_dir, "out")
 
 
-def write_to_file(filename: str, content: s.OpenSCADObject, file_type: str) -> str:
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    scad_path = os.path.join(out_dir, filename + ".scad")
-    Path(scad_path).write_text(fix_import(s.scad_render(content)))
-    if "--3d" in sys.argv:
-        return to_3d(scad_path, f"{filename}.{file_type}")
-    return "2d-only"
-
-
-def write_raw_scad(filename: str, body: str) -> None:
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    Path(os.path.join(out_dir, filename + ".scad")).write_text(body)
+def write_to_file(
+    folder: str,
+    file_name: str,
+    content: s.OpenSCADObject,
+    three_d_file_type: Optional[str],
+) -> None:
+    folder_path = os.path.join(out_dir, folder)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    scad_path = os.path.join(folder_path, file_name + ".scad")
+    Path(scad_path).write_text(fix_import(s.scad_render(content)), encoding="utf-8")
+    print(f"Wrote {scad_path}")
+    if "--3d" in sys.argv and three_d_file_type:
+        three_d_path = os.path.join(folder_path, file_name + "." + three_d_file_type)
+        three_d_status = to_3d(scad_path, three_d_path)
+        print(f"Write {three_d_path} status: {three_d_status}")
 
 
 THREE_D_CACHE_NAME = ".3d-cache.json"
@@ -276,29 +296,57 @@ def to_3d(scad_path: str, three_d_path: str) -> str:
     return "failed"
 
 
-_print_flower_layout()
+def main():
+    variants = [True]
+    if "--prod" in sys.argv:
+        variants = [False]
+    for debug in variants:
+        folder = "petals/debug/" if debug else "petals/"
 
-variants = [True]
-if "--prod" in sys.argv:
-    variants = [False]
-for debug in variants:
-    postfix = "-debug" if debug else ""
-    single_petal_file_name = "single-petal" + postfix
-    status = write_to_file(single_petal_file_name, generate_petal(debug), "stl")
-    print(f"Wrote cad/out/{single_petal_file_name}.scad status: {status}")
+        # Single petal
+        single_petal_file_name = "single-petal"
+        write_to_file(folder, single_petal_file_name, generate_petal(debug), "stl")
 
-    flower_assembly_file_name = "flower-assembly" + postfix
-    write_raw_scad(
-        flower_assembly_file_name, generate_flower_assembly_scad(single_petal_file_name)
-    )
-    print(
-        f"Wrote cad/out/{flower_assembly_file_name}.scad (imports {single_petal_file_name}.stl)"
-    )
-
-    for lay in iter_ring_layouts():
-        scaled_petal = s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
-        status = write_to_file(f"scaled-petal-{lay.ring}", scaled_petal, "3mf")
-        print(
-            f"Wrote cad/out/scaled-petal-{lay.ring}.scad status: {status}. Print {lay.n_petals} times"
+        # Full assembly
+        write_to_file(
+            folder,
+            "flower-assembly",
+            generate_flower_assembly(
+                s.import_(single_petal_file_name + ".stl"), generate_petal_base()
+            )
+            + generate_center(),
+            None,
         )
-print("Done!")
+
+        # Ring petals
+        for lay in iter_ring_layouts():
+            write_to_file(
+                folder,
+                f"scaled-petal-{lay.ring}",
+                s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug)),
+                "3mf",
+            )
+
+        # Flower bases
+        write_to_file(
+            folder,
+            "flower-bases",
+            generate_flower_assembly(None, generate_petal_base()),
+            None,
+        )
+
+        # Bases projection
+        write_to_file(
+            folder,
+            "flower-bases-projection",
+            generate_flower_assembly(
+                None, s.projection(True)(generate_petal_base_pins())
+            ),
+            None,
+        )
+
+    print_flower_layout()
+    print("Done!")
+
+
+main()
