@@ -23,29 +23,35 @@ import solid as s
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 RESOLUTION_DEBUG = 24
-RESOLUTION_DETAILED = 50
+RESOLUTION_DETAILED = 100
 # Sweep profile density: path_sweep2d cost scales with this × sweep segments; keep debug low.
 SPLINE_STEPS_DEBUG = 8
 SPLINE_STEPS_PRINT = 24
 
 # Flower layout (tune): concentric rings around origin in XY, petals face the center.
-NUM_RINGS = 5
-MIN_SCALE = 0.5
+NUM_RINGS = 6
+MIN_SCALE = 0.35
 INNER_RING_RADIUS = 35.0
 RING_SPACING_DELTA = 40.0
 # Target arc length along each ring per petal — smaller ⇒ more petals on that ring.
-PETAL_ARC_MM = 50.0
+PETAL_ARC_MM = 45.0
 # Extra Z rotation so petal local “forward” points radially inward after placement.
 FACE_CENTER_Z_DEG = 300.0
 PETAL_ROTATE = 50.0
+EST_WEIGHT_G = 21
 
-OPENSCAD_PATH = '/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD'
+OPENSCAD_PATH = (
+    "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD"
+    if sys.platform == "darwin"
+    else "B:\\programs\\Program Files\\OpenSCAD\\openscad.exe"
+)
 
 beziers = s.import_scad("BOSL2/beziers.scad")
 lists = s.import_scad("BOSL2/lists.scad")
 skin = s.import_scad("BOSL2/skin.scad")
 transforms = s.import_scad("BOSL2/transforms.scad")
 drawing = s.import_scad("BOSL2/drawing.scad")
+
 
 def generate_petal(debug: bool) -> s.OpenSCADObject:
     petal_x = 12
@@ -65,22 +71,30 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
             beziers.bez_end([4, 0], [-5, 10]),
         ]
     )
-    outer_curve = beziers.bezpath_curve(outer_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
-    inner_curve = beziers.bezpath_curve(inner_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
+    outer_curve = beziers.bezpath_curve(
+        outer_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT
+    )
+    inner_curve = beziers.bezpath_curve(
+        inner_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT
+    )
 
     # ``flatten([outer, inner])`` plus ``move`` centers the full petal like mirroring the half.
     petal_shape = transforms.move(
         [-petal_x, 0], p=lists.flatten([outer_curve, inner_curve])
     )
     elliptic_arc = transforms.xscale(
-        3, p=drawing.arc(n=RESOLUTION_DEBUG if debug else RESOLUTION_DETAILED, angle=[180, 0], r=1))
+        3,
+        p=drawing.arc(
+            n=RESOLUTION_DEBUG if debug else RESOLUTION_DETAILED, angle=[180, 0], r=1
+        ),
+    )
     # Reverse so profile winding matches the sweep; path_sweep2d needs a 2D path (shape Y → Z).
     sweep_path = lists.reverse(elliptic_arc)
     petal = skin.path_sweep2d(petal_shape, sweep_path)
 
     # Debug skips the base extension: it duplicates path_sweep2d and projection(cut) is very slow.
     extension = s.projection(cut=True)(petal)
-    extension = s.linear_extrude(height=10, convexity=4)(extension)
+    extension = s.linear_extrude(height=15, convexity=4)(extension)
     extension = s.mirror((0, 0, 1))(extension)
     petal = petal + extension
 
@@ -97,7 +111,6 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
     base = base + pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
 
     return (petal - cube) + base
-
 
 
 def generate_flower_assembly_scad(file_name: str) -> str:
@@ -158,14 +171,17 @@ def _print_flower_layout() -> None:
         f"RING_SPACING_MAX={RING_SPACING_DELTA}, PETAL_ARC_MM={PETAL_ARC_MM}, MIN_SCALE={MIN_SCALE}"
     )
     total_petals = 0
+    total_weight_g = 0
     for lay in iter_ring_layouts():
         total_petals += lay.n_petals
         circumference = 2 * math.pi * lay.ring_radius
+        total_weight_g += lay.n_petals * EST_WEIGHT_G * lay.scale**2
         print(
             f"  ring {lay.ring}: radius={lay.ring_radius:.2f} mm, circumference={circumference:.2f} mm, "
             f"scale={lay.scale:.4f}, petals={lay.n_petals}"
         )
     print(f"  total petals (all rings): {total_petals}")
+    print(f"  total weight (all rings): {total_weight_g:.2f} g")
 
 
 def fix_import(scad: str) -> str:
@@ -182,8 +198,10 @@ def fix_import(scad: str) -> str:
     )
     return scad
 
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 out_dir = os.path.join(current_dir, "out")
+
 
 def write_to_file(filename: str, content: s.OpenSCADObject, file_type: str) -> str:
     if not os.path.exists(out_dir):
@@ -270,11 +288,17 @@ for debug in variants:
     print(f"Wrote cad/out/{single_petal_file_name}.scad status: {status}")
 
     flower_assembly_file_name = "flower-assembly" + postfix
-    write_raw_scad(flower_assembly_file_name, generate_flower_assembly_scad(single_petal_file_name))
-    print(f"Wrote cad/out/{flower_assembly_file_name}.scad (imports {single_petal_file_name}.stl)")
+    write_raw_scad(
+        flower_assembly_file_name, generate_flower_assembly_scad(single_petal_file_name)
+    )
+    print(
+        f"Wrote cad/out/{flower_assembly_file_name}.scad (imports {single_petal_file_name}.stl)"
+    )
 
     for lay in iter_ring_layouts():
         scaled_petal = s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
         status = write_to_file(f"scaled-petal-{lay.ring}", scaled_petal, "3mf")
-        print(f"Wrote cad/out/scaled-petal-{lay.ring}.scad status: {status}. Print {lay.n_petals} times")
+        print(
+            f"Wrote cad/out/scaled-petal-{lay.ring}.scad status: {status}. Print {lay.n_petals} times"
+        )
 print("Done!")
