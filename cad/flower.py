@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 import sys
 from pathlib import Path
-from typing import Dict, Iterator, List
+from typing import Dict, Iterator, List, Optional
 import subprocess
 import solid as s
 
@@ -47,6 +47,16 @@ skin = s.import_scad("BOSL2/skin.scad")
 transforms = s.import_scad("BOSL2/transforms.scad")
 drawing = s.import_scad("BOSL2/drawing.scad")
 
+
+def generate_petal_base_pins() -> s.OpenSCADObject:
+    pin = s.translate((6, 0, -10))(s.cylinder(r=1, h=10, segments=100))
+    return pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
+
+
+def generate_petal_base() -> s.OpenSCADObject:
+    return s.translate((0, 0, -1))(s.cylinder(r=7, h=1, segments=100)) + generate_petal_base_pins()
+
+
 def generate_petal(debug: bool) -> s.OpenSCADObject:
     petal_x = 12
     outer_bezpath = lists.flatten(
@@ -65,8 +75,10 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
             beziers.bez_end([4, 0], [-5, 10]),
         ]
     )
-    outer_curve = beziers.bezpath_curve(outer_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
-    inner_curve = beziers.bezpath_curve(inner_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
+    outer_curve = beziers.bezpath_curve(
+        outer_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
+    inner_curve = beziers.bezpath_curve(
+        inner_bezpath, splinesteps=SPLINE_STEPS_DEBUG if debug else SPLINE_STEPS_PRINT)
 
     # ``flatten([outer, inner])`` plus ``move`` centers the full petal like mirroring the half.
     petal_shape = transforms.move(
@@ -89,36 +101,30 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
 
     # Remove the XZ plane
     cube = s.translate((0, 0, -50))(s.cube([100, 100, 100], center=True))
-    petal = petal - cube
 
-    # Add a base
-    base = s.translate((0, 0, -1))(s.cylinder(r=16, h=1, segments=100))
-    pin = s.translate((14, 0, -10))(s.cylinder(r=2, h=10, segments=100))
-    base = base + pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
-
-    return (petal - cube) + base
+    return petal - cube
 
 
-
-def generate_flower_assembly_scad(file_name: str) -> str:
-    """Union of ``import(petal.stl)`` with ring placement — fast preview/render vs full CSG."""
-    stl_name = f"{file_name}.stl"
-    header = (
-        f"// Requires {stl_name} in this directory (export from {file_name}.scad).\n\n"
-    )
-    parts: List[str] = []
+def generate_flower_assembly(flower: Optional[s.OpenSCADObject], base: s.OpenSCADObject) -> s.OpenSCADObject:
+    parts: List[s.OpenSCADObject] = []
     for lay in iter_ring_layouts():
         stagger = lay.angle_per_petal / 2.0 if lay.ring % 2 == 0 else 0.0
         for i in range(lay.n_petals):
             angle_deg = lay.angle_per_petal * i + stagger
+            scaled_obj = base
+            if flower:
+                scaled_obj = scaled_obj + s.scale((lay.scale, lay.scale, lay.scale))(
+                    flower
+                )
             parts.append(
-                f"""  rotate([0, 0, {angle_deg:g}])
-  translate([{lay.ring_radius:g}, 0, 0])
-  rotate([0, 0, {FACE_CENTER_Z_DEG:g}])
-  scale([{lay.scale:g}, {lay.scale:g}, {lay.scale:g}])
-  import("{stl_name}");"""
+                s.rotate((0, 0, angle_deg))(
+                    s.translate((lay.ring_radius, 0, 0))(
+                        s.rotate((0, 0, FACE_CENTER_Z_DEG))(
+                            scaled_obj)
+                    )
+                )
             )
-    return header + "union() {\n" + "\n".join(parts) + "\n}\n"
+    return s.union()(*parts)
 
 
 @dataclass(frozen=True)
@@ -150,7 +156,7 @@ def iter_ring_layouts() -> Iterator[RingLayout]:
         )
 
 
-def _print_flower_layout() -> None:
+def print_flower_layout() -> None:
     """Log ring radii, petals per ring, and totals (same math as ``generate_flower``)."""
     print("Flower layout:")
     print(
@@ -182,23 +188,24 @@ def fix_import(scad: str) -> str:
     )
     return scad
 
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 out_dir = os.path.join(current_dir, "out")
 
-def write_to_file(filename: str, content: s.OpenSCADObject, file_type: str) -> str:
+
+def write_to_file(filename: str, content: s.OpenSCADObject, three_d_file_type: Optional[str]) -> None:
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-    scad_path = os.path.join(out_dir, filename + ".scad")
+    file_path = filename + ".scad"
+    scad_path = os.path.join(out_dir, file_path)
     Path(scad_path).write_text(fix_import(s.scad_render(content)))
-    if "--3d" in sys.argv:
-        return to_3d(scad_path, f"{filename}.{file_type}")
-    return "2d-only"
-
-
-def write_raw_scad(filename: str, body: str) -> None:
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    Path(os.path.join(out_dir, filename + ".scad")).write_text(body)
+    print(
+        f"Wrote cad/out/{file_path}")
+    if "--3d" in sys.argv and three_d_file_type:
+        three_d_path = f"{filename}.{three_d_file_type}"
+        three_d_status = to_3d(scad_path, three_d_path)
+        print(
+            f"Write cad/out/{three_d_path} status: {three_d_status}")
 
 
 THREE_D_CACHE_NAME = ".3d-cache.json"
@@ -258,23 +265,33 @@ def to_3d(scad_path: str, three_d_path: str) -> str:
     return "failed"
 
 
-_print_flower_layout()
-
 variants = [True]
 if "--prod" in sys.argv:
     variants = [False]
 for debug in variants:
     postfix = "-debug" if debug else ""
+
+    # Single petal
     single_petal_file_name = "single-petal" + postfix
-    status = write_to_file(single_petal_file_name, generate_petal(debug), "stl")
-    print(f"Wrote cad/out/{single_petal_file_name}.scad status: {status}")
+    write_to_file(single_petal_file_name,
+                  generate_petal(debug), "stl")
 
-    flower_assembly_file_name = "flower-assembly" + postfix
-    write_raw_scad(flower_assembly_file_name, generate_flower_assembly_scad(single_petal_file_name))
-    print(f"Wrote cad/out/{flower_assembly_file_name}.scad (imports {single_petal_file_name}.stl)")
+    # Full assembly
+    write_to_file("flower-assembly" + postfix,
+                  generate_flower_assembly(s.import_(single_petal_file_name + ".stl"), generate_petal_base()), None)
 
+    # Ring petals
     for lay in iter_ring_layouts():
-        scaled_petal = s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
-        status = write_to_file(f"scaled-petal-{lay.ring}", scaled_petal, "3mf")
-        print(f"Wrote cad/out/scaled-petal-{lay.ring}.scad status: {status}. Print {lay.n_petals} times")
+        write_to_file(f"scaled-petal-{lay.ring}", s.scale((lay.scale, lay.scale, lay.scale))(
+            generate_petal(debug)), "3mf")
+
+# Flower bases
+write_to_file("flower-bases",
+              generate_flower_assembly(None, generate_petal_base()), None)
+
+# Bases projection
+write_to_file("flower-bases-projection",
+              generate_flower_assembly(None, s.projection(True)(generate_petal_base_pins())), None)
+
+print_flower_layout()
 print("Done!")
