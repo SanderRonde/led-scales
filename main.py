@@ -124,9 +124,9 @@ def generate_cad(mode: str = "") -> None:
     print("Generating CAD files...")
     activate_script = get_venv_activate("cad")
     if sys.platform == "win32":
-        cmd = f'"{activate_script}" && python cad/led-scales.py {mode}'
+        cmd = f'"{activate_script}" && python cad/led-scales.py {mode} && python cad/flower.py {mode}'
     else:
-        cmd = f'. "{activate_script}" && python cad/led-scales.py {mode}'
+        cmd = f'. "{activate_script}" && python cad/led-scales.py {mode} && python cad/flower.py {mode}'
 
     run_command(cmd)
     print("CAD generation complete! Files can be found in the cad/out directory")
@@ -151,6 +151,7 @@ def run_leds(mode: ConfigMode, mock: bool = False, debug: bool = False) -> None:
         cmd = f'. "{activate_script}" && python -m leds.leds {flags_str}'
     run_command(cmd)
 
+
 def install_leds(mode: ConfigMode) -> None:
     print("Installing LEDs service")
 
@@ -158,7 +159,7 @@ def install_leds(mode: ConfigMode) -> None:
         print("Only supported on linux")
         sys.exit(1)
 
-    if os.geteuid() != 0: # type: ignore pylint: disable=no-member
+    if os.geteuid() != 0:  # type: ignore pylint: disable=no-member
         print("Run this as root")
         sys.exit(1)
 
@@ -198,6 +199,7 @@ def install_leds(mode: ConfigMode) -> None:
     print(f"  sudo systemctl status {service_name}")
     print(f"  sudo systemctl stop {service_name}")
     print(f"  sudo systemctl disable {service_name}")
+
 
 def clean() -> None:
     print("Cleaning up...")
