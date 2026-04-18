@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 import sys
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Dict, List, Optional
 import subprocess
 import solid as s
 
@@ -38,6 +38,7 @@ PETAL_ARC_MM = 50.0
 # Extra Z rotation so petal local “forward” points radially inward after placement.
 FACE_CENTER_Z_DEG = 300.0
 PETAL_ROTATE = 50.0
+PETAL_BASE_RADIUS = 7
 
 OPENSCAD_PATH = '/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD'
 
@@ -54,7 +55,7 @@ def generate_petal_base_pins() -> s.OpenSCADObject:
 
 
 def generate_petal_base() -> s.OpenSCADObject:
-    return s.translate((0, 0, -1))(s.cylinder(r=7, h=1, segments=100)) + generate_petal_base_pins()
+    return s.translate((0, 0, -1))(s.cylinder(r=PETAL_BASE_RADIUS, h=1, segments=100)) + generate_petal_base_pins()
 
 
 def generate_petal(debug: bool) -> s.OpenSCADObject:
@@ -105,8 +106,13 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
     return petal - cube
 
 
+def get_center_radius() -> float:
+    center_layer = iter_ring_layouts()[0]
+    return center_layer.ring_radius - PETAL_BASE_RADIUS - 1
+
+
 def generate_flower_assembly(flower: Optional[s.OpenSCADObject], base: s.OpenSCADObject) -> s.OpenSCADObject:
-    parts: List[s.OpenSCADObject] = []
+    object = s.union()
     for lay in iter_ring_layouts():
         stagger = lay.angle_per_petal / 2.0 if lay.ring % 2 == 0 else 0.0
         for i in range(lay.n_petals):
@@ -116,7 +122,7 @@ def generate_flower_assembly(flower: Optional[s.OpenSCADObject], base: s.OpenSCA
                 scaled_obj = scaled_obj + s.scale((lay.scale, lay.scale, lay.scale))(
                     flower
                 )
-            parts.append(
+            object = object + (
                 s.rotate((0, 0, angle_deg))(
                     s.translate((lay.ring_radius, 0, 0))(
                         s.rotate((0, 0, FACE_CENTER_Z_DEG))(
@@ -124,7 +130,12 @@ def generate_flower_assembly(flower: Optional[s.OpenSCADObject], base: s.OpenSCA
                     )
                 )
             )
-    return s.union()(*parts)
+
+    return object
+
+
+def generate_center() -> s.OpenSCADObject:
+    return s.cylinder(get_center_radius(), 1)
 
 
 @dataclass(frozen=True)
@@ -136,32 +147,31 @@ class RingLayout:
     angle_per_petal: float
 
 
-def iter_ring_layouts() -> Iterator[RingLayout]:
+def iter_ring_layouts() -> List[RingLayout]:
     """Ring radius, scale, and petal count — single source for layout and assembly SCAD."""
-    if NUM_RINGS <= 0:
-        return
     scale_step = (1.0 - MIN_SCALE) / (NUM_RINGS - 1) if NUM_RINGS > 1 else 0.0
     ring_radius = INNER_RING_RADIUS
+    ring_layouts = []
     for ring in range(NUM_RINGS):
         scale = MIN_SCALE + ring * scale_step
         ring_radius += RING_SPACING_DELTA * scale
         circumference = 2 * math.pi * ring_radius
         n_petals = max(3, int((circumference / PETAL_ARC_MM) * (1.0 / scale)))
-        yield RingLayout(
+        ring_layouts.append(RingLayout(
             ring=ring,
             ring_radius=ring_radius,
             scale=scale,
             n_petals=n_petals,
             angle_per_petal=360.0 / n_petals,
-        )
+        ))
+    return ring_layouts
 
 
 def print_flower_layout() -> None:
     """Log ring radii, petals per ring, and totals (same math as ``generate_flower``)."""
     print("Flower layout:")
     print(
-        f"  NUM_RINGS={NUM_RINGS}, INNER_RING_RADIUS={INNER_RING_RADIUS}, "
-        f"RING_SPACING_MAX={RING_SPACING_DELTA}, PETAL_ARC_MM={PETAL_ARC_MM}, MIN_SCALE={MIN_SCALE}"
+        f"  num rings:{NUM_RINGS}\n  center radius:{get_center_radius()}"
     )
     total_petals = 0
     for lay in iter_ring_layouts():
@@ -278,7 +288,7 @@ for debug in variants:
 
     # Full assembly
     write_to_file("flower-assembly" + postfix,
-                  generate_flower_assembly(s.import_(single_petal_file_name + ".stl"), generate_petal_base()), None)
+                  generate_flower_assembly(s.import_(single_petal_file_name + ".stl"), generate_petal_base()) + generate_center(), None)
 
     # Ring petals
     for lay in iter_ring_layouts():
