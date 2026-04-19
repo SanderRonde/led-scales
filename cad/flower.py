@@ -530,7 +530,8 @@ def main():
             write_to_file(
                 folder,
                 f"scaled-petal-{lay.ring}",
-                s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug)),
+                s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
+                + generate_petal_base(),
                 "3mf",
             )
 
