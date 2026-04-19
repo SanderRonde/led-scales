@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import subprocess
 import solid as s
 
@@ -28,6 +28,16 @@ NUM_RINGS = 6
 MIN_SCALE = 0.35
 INNER_RING_RADIUS = 35.0
 RING_SPACING_DELTA = 40.0
+
+# -----------------------------------------------------------------------------
+# Petal color: ring 0 (innermost) uses PETAL_GRADIENT_CENTER, ring NUM_RINGS-1
+# uses PETAL_GRADIENT_OUTER, with linear RGB interpolation between. Values are
+# "#RRGGBB" hex strings (also accepted: "RRGGBB" without #).
+# -----------------------------------------------------------------------------
+# --- Default: yellow (center) → red (outer) ---
+PETAL_GRADIENT_CENTER = "#fcea81"
+PETAL_GRADIENT_OUTER = "#fc3d4f"
+
 # Target arc length along each ring per petal — smaller ⇒ more petals on that ring.
 PETAL_ARC_MM = 45.0
 # Extra Z rotation so petal local “forward” points radially inward after placement.
@@ -88,6 +98,34 @@ lists = s.import_scad("BOSL2/lists.scad")
 skin = s.import_scad("BOSL2/skin.scad")
 transforms = s.import_scad("BOSL2/transforms.scad")
 drawing = s.import_scad("BOSL2/drawing.scad")
+
+
+def _parse_hex_rgb01(hex_color: str) -> Tuple[float, float, float]:
+    h = hex_color.strip().lstrip("#")
+    if len(h) != 6 or any(c not in "0123456789abcdefABCDEF" for c in h):
+        raise ValueError(f"PETAL gradient color must be #RRGGBB (got {hex_color!r})")
+    r = int(h[0:2], 16) / 255.0
+    g = int(h[2:4], 16) / 255.0
+    b = int(h[4:6], 16) / 255.0
+    return (r, g, b)
+
+
+def petal_rgb_for_ring(ring: int) -> Tuple[float, float, float]:
+    """RGB in 0..1 for ``ring`` (0 = inner, NUM_RINGS-1 = outer)."""
+    t = 0.0 if NUM_RINGS <= 1 else ring / float(NUM_RINGS - 1)
+    t = max(0.0, min(1.0, t))
+    c0 = _parse_hex_rgb01(PETAL_GRADIENT_CENTER)
+    c1 = _parse_hex_rgb01(PETAL_GRADIENT_OUTER)
+    return (
+        c0[0] + (c1[0] - c0[0]) * t,
+        c0[1] + (c1[1] - c0[1]) * t,
+        c0[2] + (c1[2] - c0[2]) * t,
+    )
+
+
+def with_petal_ring_color(ring: int, obj: s.OpenSCADObject) -> s.OpenSCADObject:
+    r, g, b = petal_rgb_for_ring(ring)
+    return s.color((r, g, b))(obj)
 
 
 def generate_petal_base_pins() -> s.OpenSCADObject:
@@ -169,6 +207,7 @@ def generate_flower_assembly(
                 scaled_obj = scaled_obj + s.scale((lay.scale, lay.scale, lay.scale))(
                     flower
                 )
+                scaled_obj = with_petal_ring_color(lay.ring, scaled_obj)
             obj = obj + (
                 s.rotate((0, 0, angle_deg))(
                     s.translate((lay.ring_radius, 0, 0))(
@@ -494,9 +533,13 @@ def main():
     for debug in variants:
         out_folder = "petals/debug/" if debug else "petals/"
 
-        # Single petal
+        # Single petal (inner-ring hue)
         single_petal_3d_path = write_3d(
-            write_scad(generate_petal(debug), out_folder, "single-petal")
+            write_scad(
+                with_petal_ring_color(0, generate_petal(debug)),
+                out_folder,
+                "single-petal",
+            )
         )
 
         # Full assembly
@@ -523,8 +566,13 @@ def main():
         for lay in iter_ring_layouts():
             scaled_petal_3d_path = write_3d(
                 write_scad(
-                    s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
-                    + generate_petal_base(),
+                    with_petal_ring_color(
+                        lay.ring,
+                        s.scale((lay.scale, lay.scale, lay.scale))(
+                            generate_petal(debug)
+                        )
+                        + generate_petal_base(),
+                    ),
                     out_folder,
                     f"parts/scaled-petal-{lay.ring}",
                 )
