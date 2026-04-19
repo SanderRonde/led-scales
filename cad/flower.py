@@ -653,7 +653,22 @@ def to_3d(scad_path: str, three_d_path: str) -> str:
     return "failed"
 
 
+def _reexec_with_pythonhashseed_zero_if_needed() -> None:
+    """SolidPython output can vary across runs unless PYTHONHASHSEED is fixed (set/dict iteration).
+
+    Re-exec once so the interpreter and solid see a stable seed; export cache keys on SCAD SHA-256 then match.
+    """
+    if os.environ.get("PYTHONHASHSEED") == "0":
+        return
+    env = os.environ.copy()
+    env["PYTHONHASHSEED"] = "0"
+    script = os.path.normpath(os.path.abspath(__file__))
+    argv = [sys.executable, script, *sys.argv[1:]]
+    os.execve(sys.executable, argv, env)
+
+
 def main():
+    _reexec_with_pythonhashseed_zero_if_needed()
     variants = [True]
     if "--prod" in sys.argv:
         variants = [False]
