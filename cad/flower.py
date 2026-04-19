@@ -92,6 +92,7 @@ CENTER_STAMEN_RNG_SEED = 1337
 # Per-unit segment counts: keep low since we place hundreds of primitives.
 CENTER_UNIT_SEGS_DEBUG = 6
 CENTER_UNIT_SEGS_PRINT = 16
+TOLERANCE = 0.1
 
 OPENSCAD_PATH = (
     "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD"
@@ -134,16 +135,15 @@ def with_petal_ring_color(ring: int, obj: s.OpenSCADObject) -> s.OpenSCADObject:
     return s.color((r, g, b))(obj)
 
 
-def generate_petal_base_pins() -> s.OpenSCADObject:
-    pin = s.translate((6, 0, -10))(s.cylinder(r=1, h=10, segments=100))
+def generate_petal_base_pins(tolerance: float = 0.0) -> s.OpenSCADObject:
+    pin = s.translate((6, 0, -10))(s.cylinder(r=1 + tolerance, h=10, segments=100))
     return pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
 
 
-def generate_petal_base() -> s.OpenSCADObject:
-    return (
-        s.translate((0, 0, -1))(s.cylinder(r=PETAL_BASE_RADIUS, h=1, segments=100))
-        + generate_petal_base_pins()
-    )
+def generate_petal_base(tolerance: float = 0.0) -> s.OpenSCADObject:
+    return s.translate((0, 0, -1))(
+        s.cylinder(r=PETAL_BASE_RADIUS, h=1, segments=100)
+    ) + generate_petal_base_pins(tolerance)
 
 
 def generate_petal(debug: bool) -> s.OpenSCADObject:
@@ -720,6 +720,15 @@ def main():
             ),
             out_folder,
             "flower-bases-projection",
+        )
+
+        # Bases projection
+        write_scad(
+            generate_flower_assembly(
+                None, s.projection(True)(generate_petal_base_pins(TOLERANCE))
+            ),
+            out_folder,
+            "flower-bases-projection-with-tolerance",
         )
 
     print_flower_layout()
