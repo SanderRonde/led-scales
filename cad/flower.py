@@ -4,11 +4,15 @@ import math
 import os
 import random
 import re
+import struct
+import zipfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import subprocess
+import numpy as np
 import solid as s
 
 # To auto watch and run:
@@ -28,6 +32,8 @@ NUM_RINGS = 6
 MIN_SCALE = 0.35
 INNER_RING_RADIUS = 35.0
 RING_SPACING_DELTA = 40.0
+# Extra space between copies on the exported ``all-petals`` plate (Python merge).
+ALL_PETALS_PLATE_GAP_MM = 2.0
 
 # -----------------------------------------------------------------------------
 # Petal color: ring 0 (innermost) uses PETAL_GRADIENT_CENTER, ring NUM_RINGS-1
@@ -504,6 +510,127 @@ def _save_3d_cache(cache: Dict[str, str]) -> None:
     )
 
 
+_THREEMF_CORE_NS = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
+
+
+def _threemf_tag(local: str) -> str:
+    return f"{{{_THREEMF_CORE_NS}}}{local}"
+
+
+def read_3mf_triangle_mesh(path: str) -> Tuple[np.ndarray, np.ndarray]:
+    """Load the first mesh from a 3MF as ``(vertices, faces)`` (N×3, M×3)."""
+    with zipfile.ZipFile(path, "r") as zf:
+        model_xml = zf.read("3D/3dmodel.model")
+    root = ET.fromstring(model_xml)
+    mesh = root.find(f".//{_threemf_tag('mesh')}")
+    if mesh is None:
+        raise ValueError(f"No mesh in 3MF: {path}")
+
+    verts_el = mesh.find(_threemf_tag("vertices"))
+    if verts_el is None:
+        raise ValueError(f"No vertices in 3MF: {path}")
+    n = len(verts_el)
+    vertices = np.empty((n, 3), dtype=np.float64)
+    for i, ve in enumerate(verts_el):
+        vertices[i, 0] = float(ve.attrib["x"])
+        vertices[i, 1] = float(ve.attrib["y"])
+        vertices[i, 2] = float(ve.attrib["z"])
+
+    tris_el = mesh.find(_threemf_tag("triangles"))
+    if tris_el is None:
+        raise ValueError(f"No triangles in 3MF: {path}")
+    m = len(tris_el)
+    faces = np.empty((m, 3), dtype=np.int64)
+    for i, te in enumerate(tris_el):
+        faces[i, 0] = int(te.attrib["v1"])
+        faces[i, 1] = int(te.attrib["v2"])
+        faces[i, 2] = int(te.attrib["v3"])
+
+    return vertices, faces
+
+
+def write_binary_stl(path: str, vertices: np.ndarray, faces: np.ndarray) -> None:
+    """Write a binary STL (single solid, possibly disjoint shells)."""
+    v = np.ascontiguousarray(vertices, dtype=np.float64)
+    f = np.ascontiguousarray(faces, dtype=np.int64)
+    tris = v[f]
+    e1 = tris[:, 1] - tris[:, 0]
+    e2 = tris[:, 2] - tris[:, 0]
+    ns = np.cross(e1, e2)
+    ln = np.linalg.norm(ns, axis=1, keepdims=True)
+    ln = np.maximum(ln, 1e-30)
+    normals = (ns / ln).astype(np.float32)
+    pts = tris.astype(np.float32)
+    n_tri = int(pts.shape[0])
+    header = b"all-petals plate (merged in Python)\0"
+    header = (header + b"\0" * 80)[:80]
+    rec = np.empty(
+        n_tri,
+        dtype=np.dtype(
+            [("n", "<f4", (3,)), ("v", "<f4", (9,)), ("a", "<u2")], align=False
+        ),
+    )
+    rec["n"] = normals
+    rec["v"] = pts.reshape(n_tri, 9)
+    rec["a"] = 0
+    with open(path, "wb") as fp:
+        fp.write(header)
+        fp.write(struct.pack("<I", n_tri))
+        rec.tofile(fp)
+
+
+def combine_scaled_petals_plate_stl(
+    out_folder: str, ring_layouts: List[RingLayout]
+) -> Optional[str]:
+    """Place ``n_petals`` copies of each ring mesh on a flat plate and write one STL.
+
+    Avoids OpenSCAD ``import()`` + ``union()`` for ``all-petals``, which is very slow
+    when there are hundreds of instances.
+    """
+    if "--3d" not in sys.argv:
+        return None
+
+    meshes: Dict[int, Tuple[np.ndarray, np.ndarray]] = {}
+    for lay in ring_layouts:
+        mf = os.path.join(out_dir, out_folder, f"parts/scaled-petal-{lay.ring}.3mf")
+        if not os.path.isfile(mf):
+            print(f"combine_scaled_petals_plate_stl: missing {mf}, skip plate")
+            return None
+        meshes[lay.ring] = read_3mf_triangle_mesh(mf)
+
+    out_blocks_v: List[np.ndarray] = []
+    out_blocks_f: List[np.ndarray] = []
+    v_offset = 0
+    y_cursor = 0.0
+
+    for lay in ring_layouts:
+        vertices, faces = meshes[lay.ring]
+        vmin = vertices.min(axis=0)
+        vmax = vertices.max(axis=0)
+        size = vmax - vmin
+        pitch_x = float(size[0]) + ALL_PETALS_PLATE_GAP_MM
+        x_cursor = 0.0
+        for _ in range(lay.n_petals):
+            delta = np.array(
+                [x_cursor - vmin[0], y_cursor - vmin[1], -vmin[2]], dtype=np.float64
+            )
+            out_blocks_v.append(vertices + delta)
+            out_blocks_f.append(faces + v_offset)
+            v_offset += vertices.shape[0]
+            x_cursor += pitch_x
+        y_cursor += float(size[1]) + ALL_PETALS_PLATE_GAP_MM
+
+    v_all = np.vstack(out_blocks_v)
+    f_all = np.vstack(out_blocks_f)
+    stl_path = os.path.join(out_dir, out_folder, "all-petals.stl")
+    parent = os.path.dirname(stl_path)
+    if not os.path.exists(parent):
+        os.makedirs(parent)
+    write_binary_stl(stl_path, v_all, f_all)
+    print(f"Wrote {stl_path} ({v_all.shape[0]} vertices, {f_all.shape[0]} triangles)")
+    return stl_path
+
+
 def to_3d(scad_path: str, three_d_path: str) -> str:
     if not os.path.isfile(scad_path):
         return "missing_scad"
@@ -561,10 +688,10 @@ def main():
             )
         )
 
-        # Individual petals & all petals
-        all_petals = s.union()
-        for lay in iter_ring_layouts():
-            scaled_petal_3d_path = write_3d(
+        # Individual petals; one plate STL merged in Python (no OpenSCAD all-petals union).
+        ring_layouts = iter_ring_layouts()
+        for lay in ring_layouts:
+            write_3d(
                 write_scad(
                     with_petal_ring_color(
                         lay.ring,
@@ -577,11 +704,7 @@ def main():
                     f"parts/scaled-petal-{lay.ring}",
                 )
             )
-            for i in range(lay.n_petals):
-                all_petals = all_petals + s.translate(
-                    (lay.ring * RING_SPACING_DELTA, i * RING_SPACING_DELTA, 0)
-                )(s.import_(scaled_petal_3d_path))
-        write_3d(write_scad(all_petals, out_folder, "all-petals"))
+        combine_scaled_petals_plate_stl(out_folder, ring_layouts)
 
         # Flower bases
         write_scad(
@@ -603,4 +726,5 @@ def main():
     print("Done!")
 
 
-main()
+if __name__ == "__main__":
+    main()
