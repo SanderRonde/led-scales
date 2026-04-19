@@ -1,9 +1,3 @@
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownParameterType=false
-# pyright: reportPrivateUsage=false
-# pylint: disable=duplicate-code
-
 import hashlib
 import json
 import math
@@ -13,7 +7,7 @@ import re
 from dataclasses import dataclass
 import sys
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Optional
 import subprocess
 import solid as s
 
@@ -365,7 +359,7 @@ def iter_ring_layouts() -> List[RingLayout]:
     """Ring radius, scale, and petal count — single source for layout and assembly SCAD."""
     scale_step = (1.0 - MIN_SCALE) / (NUM_RINGS - 1) if NUM_RINGS > 1 else 0.0
     ring_radius = INNER_RING_RADIUS
-    ring_layouts = []
+    ring_layouts: List[RingLayout] = []
     for ring in range(NUM_RINGS):
         scale = MIN_SCALE + ring * scale_step
         ring_radius += RING_SPACING_DELTA * scale
@@ -420,22 +414,22 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 out_dir = os.path.join(current_dir, "out")
 
 
-def write_to_file(
-    folder: str,
-    file_name: str,
-    content: s.OpenSCADObject,
-    three_d_file_type: Optional[Literal["3mf", "stl"]],
-) -> None:
-    folder_path = os.path.join(out_dir, folder)
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-    scad_path = os.path.join(folder_path, file_name + ".scad")
+def write_scad(content: s.OpenSCADObject, folder: str, file_name: str) -> str:
+    scad_path = os.path.join(out_dir, folder, file_name + ".scad")
+    parent_dir = os.path.dirname(scad_path)
+    if not os.path.exists(parent_dir):
+        os.makedirs(parent_dir)
     Path(scad_path).write_text(fix_import(s.scad_render(content)), encoding="utf-8")
     print(f"Wrote {scad_path}")
-    if "--3d" in sys.argv and three_d_file_type:
-        three_d_path = os.path.join(folder_path, file_name + "." + three_d_file_type)
+    return scad_path
+
+
+def write_3d(scad_path: str) -> str:
+    three_d_path = scad_path.replace(".scad", ".3mf")
+    if "--3d" in sys.argv:
         three_d_status = to_3d(scad_path, three_d_path)
         print(f"Write {three_d_path} status: {three_d_status}")
+    return three_d_path
 
 
 THREE_D_CACHE_NAME = ".3d-cache.json"
@@ -454,14 +448,12 @@ def _load_3d_cache() -> Dict[str, str]:
     if not os.path.isfile(cache_path):
         return {}
     try:
-        raw = json.loads(Path(cache_path).read_text(encoding="utf-8"))
+        raw: Dict[str, str] = json.loads(Path(cache_path).read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return {}
-    if not isinstance(raw, dict):
         return {}
     out: Dict[str, str] = {}
     for k, v in raw.items():
-        if isinstance(k, str) and isinstance(v, str) and len(v) == 64:
+        if len(v) == 64:
             out[k] = v
     return out
 
@@ -500,57 +492,63 @@ def main():
     if "--prod" in sys.argv:
         variants = [False]
     for debug in variants:
-        folder = "petals/debug/" if debug else "petals/"
+        out_folder = "petals/debug/" if debug else "petals/"
 
         # Single petal
-        single_petal_file_name = "single-petal"
-        write_to_file(folder, single_petal_file_name, generate_petal(debug), "stl")
+        single_petal_3d_path = write_3d(
+            write_scad(generate_petal(debug), out_folder, "single-petal")
+        )
 
         # Full assembly
-        write_to_file(
-            folder,
-            "flower-assembly",
+        write_scad(
             generate_flower_assembly(
-                s.import_(single_petal_file_name + ".stl"), generate_petal_base()
+                s.import_(single_petal_3d_path), generate_petal_base()
             )
             + generate_center(debug),
-            None,
+            out_folder,
+            "flower-assembly",
         )
 
         # Just the center
-        write_to_file(
-            folder,
-            "flower-center",
-            generate_center(debug),
-            "3mf",
+        write_3d(
+            write_scad(
+                generate_center(debug),
+                out_folder,
+                "flower-center",
+            )
         )
 
-        # Ring petals
+        # Individual petals & all petals
+        all_petals = s.union()
         for lay in iter_ring_layouts():
-            write_to_file(
-                folder,
-                f"scaled-petal-{lay.ring}",
-                s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
-                + generate_petal_base(),
-                "3mf",
+            scaled_petal_3d_path = write_3d(
+                write_scad(
+                    s.scale((lay.scale, lay.scale, lay.scale))(generate_petal(debug))
+                    + generate_petal_base(),
+                    out_folder,
+                    f"parts/scaled-petal-{lay.ring}",
+                )
             )
+            for i in range(lay.n_petals):
+                all_petals = all_petals + s.translate(
+                    (lay.ring * RING_SPACING_DELTA, i * RING_SPACING_DELTA, 0)
+                )(s.import_(scaled_petal_3d_path))
+        write_3d(write_scad(all_petals, out_folder, "all-petals"))
 
         # Flower bases
-        write_to_file(
-            folder,
-            "flower-bases",
+        write_scad(
             generate_flower_assembly(None, generate_petal_base()),
-            None,
+            out_folder,
+            "flower-bases",
         )
 
         # Bases projection
-        write_to_file(
-            folder,
-            "flower-bases-projection",
+        write_scad(
             generate_flower_assembly(
                 None, s.projection(True)(generate_petal_base_pins())
             ),
-            None,
+            out_folder,
+            "flower-bases-projection",
         )
 
     print_flower_layout()
