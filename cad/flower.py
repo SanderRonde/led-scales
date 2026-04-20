@@ -391,6 +391,30 @@ def generate_center(debug: bool) -> s.OpenSCADObject:
     return base + s.translate((0, 0, CENTER_BASE_HEIGHT))(florets + stamens)
 
 
+def generate_backplate() -> s.OpenSCADObject:
+    last_ring = get_ring_layouts()[-1]
+    backplate_radius = last_ring.ring_radius + PETAL_BASE_RADIUS + 1
+
+    plate = s.circle(r=backplate_radius, segments=1000)
+
+    # Holes for petals
+    plate = plate - generate_flower_assembly(
+        None, s.projection(True)(generate_petal_base_pins(TOLERANCE))
+    )
+
+    # Center hole
+    plate = plate - s.circle(r=2.5, segments=100)
+
+    # Holes for mounting
+    mounting_hole = s.circle(r=0.4, segments=100)
+    plate = plate - s.translate((-15, -15, 0))(mounting_hole)
+    plate = plate - s.translate((15, -15, 0))(mounting_hole)
+    plate = plate - s.translate((-15, 15, 0))(mounting_hole)
+    plate = plate - s.translate((15, 15, 0))(mounting_hole)
+
+    return plate
+
+
 @dataclass(frozen=True)
 class RingLayout:
     ring: int
@@ -739,14 +763,9 @@ def main():
         )
 
         # Backplate
-        last_ring = get_ring_layouts()[-1]
-        backplate_radius = last_ring.ring_radius + PETAL_BASE_RADIUS + 1
         write_dxf(
             write_scad(
-                s.circle(r=backplate_radius, segments=1000)
-                - generate_flower_assembly(
-                    None, s.projection(True)(generate_petal_base_pins(TOLERANCE))
-                ),
+                generate_backplate(),
                 out_folder,
                 "backplate",
             )
