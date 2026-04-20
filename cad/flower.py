@@ -136,7 +136,7 @@ def with_petal_ring_color(ring: int, obj: s.OpenSCADObject) -> s.OpenSCADObject:
 
 
 def generate_petal_base_pins(tolerance: float = 0.0) -> s.OpenSCADObject:
-    pin = s.translate((6, 0, -10))(s.cylinder(r=1 + tolerance, h=10, segments=100))
+    pin = s.translate((6, 0, -3))(s.cylinder(r=1 + tolerance, h=3, segments=100))
     return pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
 
 
@@ -204,7 +204,7 @@ def generate_flower_assembly(
     flower: Optional[s.OpenSCADObject], base: s.OpenSCADObject
 ) -> s.OpenSCADObject:
     obj = s.union()
-    for lay in iter_ring_layouts():
+    for lay in get_ring_layouts():
         stagger = lay.angle_per_petal / 2.0 if lay.ring % 2 == 0 else 0.0
         for i in range(lay.n_petals):
             angle_deg = lay.angle_per_petal * i + stagger
@@ -380,7 +380,7 @@ def _generate_center_base(
 
 
 def generate_center(debug: bool) -> s.OpenSCADObject:
-    center_layer = iter_ring_layouts()[0]
+    center_layer = get_ring_layouts()[0]
     center_radius_base = center_layer.ring_radius - PETAL_BASE_RADIUS - 1
     center_radius = center_layer.ring_radius + (PETAL_BASE_RADIUS / 2) - 1
     base = _generate_center_base(center_radius_base, center_radius, debug)
@@ -400,7 +400,7 @@ class RingLayout:
     angle_per_petal: float
 
 
-def iter_ring_layouts() -> List[RingLayout]:
+def get_ring_layouts() -> List[RingLayout]:
     """Ring radius, scale, and petal count — single source for layout and assembly SCAD."""
     scale_step = (1.0 - MIN_SCALE) / (NUM_RINGS - 1) if NUM_RINGS > 1 else 0.0
     ring_radius = INNER_RING_RADIUS
@@ -428,7 +428,7 @@ def print_flower_layout() -> None:
     print(f"  num rings:{NUM_RINGS}")
     total_petals = 0
     total_weight_g = 0
-    for lay in iter_ring_layouts():
+    for lay in get_ring_layouts():
         total_petals += lay.n_petals
         circumference = 2 * math.pi * lay.ring_radius
         total_weight_g += lay.n_petals * EST_WEIGHT_G * lay.scale**2
@@ -472,12 +472,20 @@ def write_scad(content: s.OpenSCADObject, folder: str, file_name: str) -> str:
 def write_3d(scad_path: str) -> str:
     three_d_path = scad_path.replace(".scad", ".3mf")
     if "--3d" in sys.argv:
-        three_d_status = to_3d(scad_path, three_d_path)
-        print(f"Write {three_d_path} status: {three_d_status}")
+        status = to_export(scad_path, three_d_path)
+        print(f"Wrote {three_d_path} ({status})")
     return three_d_path
 
 
-THREE_D_CACHE_NAME = ".3d-cache.json"
+def write_dxf(scad_path: str) -> str:
+    dxf_path = scad_path.replace(".scad", ".dxf")
+    if "--3d" in sys.argv:
+        status = to_export(scad_path, dxf_path)
+        print(f"Wrote {dxf_path} ({status})")
+    return dxf_path
+
+
+EXPORT_CACHE_NAME = ".export-cache.json"
 
 
 def _scad_sha256(path: str) -> str:
@@ -488,8 +496,8 @@ def _scad_sha256(path: str) -> str:
     return h.hexdigest()
 
 
-def _load_3d_cache() -> Dict[str, str]:
-    cache_path = os.path.join(out_dir, THREE_D_CACHE_NAME)
+def _load_export_cache() -> Dict[str, str]:
+    cache_path = os.path.join(out_dir, EXPORT_CACHE_NAME)
     if not os.path.isfile(cache_path):
         return {}
     try:
@@ -503,8 +511,8 @@ def _load_3d_cache() -> Dict[str, str]:
     return out
 
 
-def _save_3d_cache(cache: Dict[str, str]) -> None:
-    cache_path = os.path.join(out_dir, THREE_D_CACHE_NAME)
+def _save_export_cache(cache: Dict[str, str]) -> None:
+    cache_path = os.path.join(out_dir, EXPORT_CACHE_NAME)
     Path(cache_path).write_text(
         json.dumps(dict(sorted(cache.items())), indent=2) + "\n", encoding="utf-8"
     )
@@ -631,26 +639,26 @@ def combine_scaled_petals_plate_stl(
     return stl_path
 
 
-def to_3d(scad_path: str, three_d_path: str) -> str:
+def to_export(scad_path: str, export_path: str) -> str:
     if not os.path.isfile(scad_path):
-        return "missing_scad"
+        raise FileNotFoundError(f"SCAD file not found: {scad_path}")
 
     scad_hash = _scad_sha256(scad_path)
-    cache = _load_3d_cache()
-    if os.path.isfile(three_d_path) and cache.get(three_d_path) == scad_hash:
-        return "skipped"
+    cache = _load_export_cache()
+    if os.path.isfile(export_path) and cache.get(export_path) == scad_hash:
+        return "cached"
 
     result = subprocess.run(
-        [OPENSCAD_PATH, "-o", three_d_path, scad_path],
+        [OPENSCAD_PATH, "-o", export_path, scad_path],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
     )
-    if result.returncode == 0 and os.path.isfile(three_d_path):
-        cache[three_d_path] = scad_hash
-        _save_3d_cache(cache)
-        return "wrote"
-    return "failed"
+    if result.returncode != 0 or not os.path.isfile(export_path):
+        raise RuntimeError(f"Failed to write 3MF file: {export_path}")
+    cache[export_path] = scad_hash
+    _save_export_cache(cache)
+    return "new"
 
 
 def _reexec_with_pythonhashseed_zero_if_needed() -> None:
@@ -659,6 +667,8 @@ def _reexec_with_pythonhashseed_zero_if_needed() -> None:
     Re-exec once so the interpreter and solid see a stable seed; export cache keys on SCAD SHA-256 then match.
     """
     if os.environ.get("PYTHONHASHSEED") == "0":
+        return
+    if os.environ.get("CAD_FLOWER_SKIP_HASHSEED_REEXEC") == "1":
         return
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = "0"
@@ -704,7 +714,7 @@ def main():
         )
 
         # Individual petals; one plate STL merged in Python (no OpenSCAD all-petals union).
-        ring_layouts = iter_ring_layouts()
+        ring_layouts = get_ring_layouts()
         for lay in ring_layouts:
             write_3d(
                 write_scad(
@@ -728,22 +738,18 @@ def main():
             "flower-bases",
         )
 
-        # Bases projection
-        write_scad(
-            generate_flower_assembly(
-                None, s.projection(True)(generate_petal_base_pins())
-            ),
-            out_folder,
-            "flower-bases-projection",
-        )
-
-        # Bases projection
-        write_scad(
-            generate_flower_assembly(
-                None, s.projection(True)(generate_petal_base_pins(TOLERANCE))
-            ),
-            out_folder,
-            "flower-bases-projection-with-tolerance",
+        # Backplate
+        last_ring = get_ring_layouts()[-1]
+        backplate_radius = last_ring.ring_radius + PETAL_BASE_RADIUS + 1
+        write_dxf(
+            write_scad(
+                s.circle(r=backplate_radius, segments=1000)
+                - generate_flower_assembly(
+                    None, s.projection(True)(generate_petal_base_pins(TOLERANCE))
+                ),
+                out_folder,
+                "backplate",
+            )
         )
 
     print_flower_layout()
