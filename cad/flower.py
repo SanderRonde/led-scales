@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import math
@@ -12,6 +14,8 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import subprocess
+import ezdxf
+from ezdxf.enums import InsertUnits, Measurement
 import numpy as np
 import solid as s
 
@@ -51,6 +55,14 @@ FACE_CENTER_Z_DEG = 300.0
 PETAL_ROTATE = 50.0
 EST_WEIGHT_G = 21
 PETAL_BASE_RADIUS = 7
+# Petal base pins (2D projection for backplate must match these)
+PETAL_PIN_OFFSET_MM = 6.0
+PETAL_PIN_BASE_R = 1.0
+# Backplate 2D — single source for OpenSCAD ``generate_backplate`` and primitive DXF
+BACKPLATE_OUTER_EXTRA_MM = 1.0
+BACKPLATE_CENTER_HOLE_R = 2.5
+BACKPLATE_MOUNT_OFFSET_MM = 15.0
+BACKPLATE_MOUNT_HOLE_R = 0.4
 
 # Sunflower-center tuning: phyllotaxis field + stamen rim around the flat disc.
 GOLDEN_ANGLE_DEG = 137.50776405003785
@@ -136,7 +148,9 @@ def with_petal_ring_color(ring: int, obj: s.OpenSCADObject) -> s.OpenSCADObject:
 
 
 def generate_petal_base_pins(tolerance: float = 0.0) -> s.OpenSCADObject:
-    pin = s.translate((6, 0, -3))(s.cylinder(r=1 + tolerance, h=3, segments=100))
+    pin = s.translate((PETAL_PIN_OFFSET_MM, 0, -3))(
+        s.cylinder(r=PETAL_PIN_BASE_R + tolerance, h=3, segments=100)
+    )
     return pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
 
 
@@ -391,11 +405,84 @@ def generate_center(debug: bool) -> s.OpenSCADObject:
     return base + s.translate((0, 0, CENTER_BASE_HEIGHT))(florets + stamens)
 
 
-def generate_backplate() -> s.OpenSCADObject:
+def backplate_outer_radius_mm() -> float:
+    """Outside radius of the backplate disc (mm)."""
     last_ring = get_ring_layouts()[-1]
-    backplate_radius = last_ring.ring_radius + PETAL_BASE_RADIUS + 1
+    return last_ring.ring_radius + PETAL_BASE_RADIUS + BACKPLATE_OUTER_EXTRA_MM
 
-    plate = s.circle(r=backplate_radius, segments=1000)
+
+def _rot_z_xy(angle_deg: float, x: float, y: float) -> Tuple[float, float]:
+    a = math.radians(angle_deg)
+    c, si = math.cos(a), math.sin(a)
+    return (c * x - si * y, si * x + c * y)
+
+
+def petal_pin_local_xy_offsets() -> List[Tuple[float, float]]:
+    """XY offsets of the three pin centers in petal-base local coordinates."""
+    return [_rot_z_xy(k * 120.0, PETAL_PIN_OFFSET_MM, 0.0) for k in range(3)]
+
+
+def backplate_pin_center_xy(
+    lay: RingLayout, petal_index: int, local_x: float, local_y: float
+) -> Tuple[float, float]:
+    """World XY of one pin after the same transforms as ``generate_flower_assembly``."""
+    stagger = lay.angle_per_petal / 2.0 if lay.ring % 2 == 0 else 0.0
+    angle_deg = lay.angle_per_petal * petal_index + stagger
+    x0, y0 = _rot_z_xy(FACE_CENTER_Z_DEG, local_x, local_y)
+    x1 = x0 + lay.ring_radius
+    y1 = y0
+    return _rot_z_xy(angle_deg, x1, y1)
+
+
+def get_backplate_dxf_circles() -> List[Tuple[float, float, float]]:
+    """All backplate circles as ``(cx, cy, radius)`` mm for primitive DXF.
+
+    First circle is the outer outline; remaining are holes (center, mounting, pins).
+    """
+    r_out = backplate_outer_radius_mm()
+    circles: List[Tuple[float, float, float]] = [(0.0, 0.0, r_out)]
+    circles.append((0.0, 0.0, BACKPLATE_CENTER_HOLE_R))
+    o = BACKPLATE_MOUNT_OFFSET_MM
+    for dx, dy in ((-o, -o), (o, -o), (-o, o), (o, o)):
+        circles.append((dx, dy, BACKPLATE_MOUNT_HOLE_R))
+    r_pin = PETAL_PIN_BASE_R + TOLERANCE
+    for lx, ly in petal_pin_local_xy_offsets():
+        for lay in get_ring_layouts():
+            for i in range(lay.n_petals):
+                cx, cy = backplate_pin_center_xy(lay, i, lx, ly)
+                circles.append((cx, cy, r_pin))
+    return circles
+
+
+def _backplate_dxf_geometry_hash() -> str:
+    payload = json.dumps(
+        [
+            (round(cx, 9), round(cy, 9), round(r, 9))
+            for cx, cy, r in get_backplate_dxf_circles()
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def write_backplate_dxf_primitive(dxf_path: str) -> None:
+    """Write backplate as DXF ``CIRCLE`` entities (true primitives, not tessellated)."""
+    parent = os.path.dirname(dxf_path)
+    if parent and not os.path.exists(parent):
+        os.makedirs(parent)
+
+    doc = ezdxf.new("R2010")  # type: ignore[attr-defined]
+    # Geometry in ``flower.py`` is authored in millimeters; declare DXF units to match.
+    doc.units = InsertUnits.Millimeters
+    doc.header["$MEASUREMENT"] = Measurement.Metric
+    msp = doc.modelspace()
+    for cx, cy, r in get_backplate_dxf_circles():
+        msp.add_circle((float(cx), float(cy)), float(r))  # type: ignore[attr-defined]
+    doc.saveas(dxf_path)  # type: ignore[attr-defined]
+
+
+def generate_backplate() -> s.OpenSCADObject:
+    r_out = backplate_outer_radius_mm()
+    plate = s.circle(r=r_out, segments=1000)
 
     # Holes for petals
     plate = plate - generate_flower_assembly(
@@ -403,14 +490,15 @@ def generate_backplate() -> s.OpenSCADObject:
     )
 
     # Center hole
-    plate = plate - s.circle(r=2.5, segments=100)
+    plate = plate - s.circle(r=BACKPLATE_CENTER_HOLE_R, segments=100)
 
     # Holes for mounting
-    mounting_hole = s.circle(r=0.4, segments=100)
-    plate = plate - s.translate((-15, -15, 0))(mounting_hole)
-    plate = plate - s.translate((15, -15, 0))(mounting_hole)
-    plate = plate - s.translate((-15, 15, 0))(mounting_hole)
-    plate = plate - s.translate((15, 15, 0))(mounting_hole)
+    mounting_hole = s.circle(r=BACKPLATE_MOUNT_HOLE_R, segments=100)
+    o = BACKPLATE_MOUNT_OFFSET_MM
+    plate = plate - s.translate((-o, -o, 0))(mounting_hole)
+    plate = plate - s.translate((o, -o, 0))(mounting_hole)
+    plate = plate - s.translate((-o, o, 0))(mounting_hole)
+    plate = plate - s.translate((o, o, 0))(mounting_hole)
 
     return plate
 
@@ -503,9 +591,17 @@ def write_3d(scad_path: str) -> str:
 
 def write_dxf(scad_path: str) -> str:
     dxf_path = scad_path.replace(".scad", ".dxf")
-    if "--3d" in sys.argv:
-        status = to_export(scad_path, dxf_path)
-        print(f"Wrote {dxf_path} ({status})")
+    if "--3d" not in sys.argv:
+        return dxf_path
+    geom_hash = _backplate_dxf_geometry_hash()
+    cache = _load_export_cache()
+    if os.path.isfile(dxf_path) and cache.get(dxf_path) == geom_hash:
+        print(f"Wrote {dxf_path} (cached)")
+        return dxf_path
+    write_backplate_dxf_primitive(dxf_path)
+    cache[dxf_path] = geom_hash
+    _save_export_cache(cache)
+    print(f"Wrote {dxf_path} (new)")
     return dxf_path
 
 

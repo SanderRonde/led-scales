@@ -38,6 +38,7 @@ PACKAGE_CONFIG: Dict[str, Any] = {
             "openpyscad",  # Required for CAD generation
             "scipy",  # Required for CAD generation
             "solidpython",  # Required for CAD generation
+            "ezdxf",  # Primitive 2D DXF (backplate CIRCLE export)
         ],
     },
 }
