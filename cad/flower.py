@@ -112,11 +112,26 @@ OPENSCAD_PATH = (
     else "B:\\programs\\Program Files\\OpenSCAD\\openscad.exe"
 )
 
-beziers = s.import_scad("BOSL2/beziers.scad")
-lists = s.import_scad("BOSL2/lists.scad")
-skin = s.import_scad("BOSL2/skin.scad")
-transforms = s.import_scad("BOSL2/transforms.scad")
-drawing = s.import_scad("BOSL2/drawing.scad")
+# BOSL2 is only needed for petal mesh generation; lazy-load so ``--dxf-only`` runs
+# without OpenSCAD library paths or BOSL2 installed.
+_bosl2_loaded = False
+beziers: object
+lists: object
+skin: object
+transforms: object
+drawing: object
+
+
+def _load_bosl2() -> None:
+    global _bosl2_loaded, beziers, lists, skin, transforms, drawing
+    if _bosl2_loaded:
+        return
+    beziers = s.import_scad("BOSL2/beziers.scad")
+    lists = s.import_scad("BOSL2/lists.scad")
+    skin = s.import_scad("BOSL2/skin.scad")
+    transforms = s.import_scad("BOSL2/transforms.scad")
+    drawing = s.import_scad("BOSL2/drawing.scad")
+    _bosl2_loaded = True
 
 
 def _parse_hex_rgb01(hex_color: str) -> Tuple[float, float, float]:
@@ -161,6 +176,7 @@ def generate_petal_base(tolerance: float = 0.0) -> s.OpenSCADObject:
 
 
 def generate_petal(debug: bool) -> s.OpenSCADObject:
+    _load_bosl2()
     petal_x = 12
     outer_bezpath = lists.flatten(
         [
@@ -591,8 +607,7 @@ def write_3d(scad_path: str) -> str:
 
 def write_dxf(scad_path: str) -> str:
     dxf_path = scad_path.replace(".scad", ".dxf")
-    if "--3d" not in sys.argv:
-        return dxf_path
+    # Primitive DXF from ``get_backplate_dxf_circles()`` (no OpenSCAD).
     geom_hash = _backplate_dxf_geometry_hash()
     cache = _load_export_cache()
     if os.path.isfile(dxf_path) and cache.get(dxf_path) == geom_hash:
@@ -804,6 +819,16 @@ def main():
         variants = [False]
     for debug in variants:
         out_folder = "petals/debug/" if debug else "petals/"
+
+        if "--dxf-only" in sys.argv:
+            write_dxf(
+                write_scad(
+                    generate_backplate(),
+                    out_folder,
+                    "backplate",
+                )
+            )
+            continue
 
         # Single petal (inner-ring hue)
         single_petal_3d_path = write_3d(
