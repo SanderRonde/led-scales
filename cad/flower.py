@@ -399,13 +399,13 @@ def generate_center(debug: bool) -> s.OpenSCADObject:
     center_radius = center_layer.ring_radius + (PETAL_BASE_RADIUS / 2) - 1
     base = _generate_center_base(center_radius_base, center_radius, debug)
     # Add center hole
-    base = base - s.translate((0, 0, -0.1))(
-        s.cylinder(r=BACKPLATE_CENTER_HOLE_R + 0.5, h=5, segments=100)
+    base = base + s.translate((0, 0, -3))(
+        s.cylinder(r=BACKPLATE_CENTER_HOLE_R - 0.2, h=3, segments=100)
     )
     # Cut out mount ring
     mount_ring = s.difference()(
-        s.cylinder(r=(BACKPLATE_MOUNT_OFFSET_MM * 2) + 2, h=6, segments=200),
-        s.cylinder(r=(BACKPLATE_MOUNT_OFFSET_MM * 2) - 2, h=6, segments=200),
+        s.cylinder(r=(BACKPLATE_MOUNT_OFFSET_MM * 2) + 2, h=4, segments=200),
+        s.cylinder(r=(BACKPLATE_MOUNT_OFFSET_MM * 2) - 2, h=4, segments=200),
     )
     base = base - s.translate((0, 0, -1))(mount_ring)
 
