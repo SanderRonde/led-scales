@@ -106,6 +106,8 @@ CENTER_UNIT_SEGS_DEBUG = 6
 CENTER_UNIT_SEGS_PRINT = 16
 TOLERANCE = 0.1
 
+PLATE_THICKNESS = 3.0
+
 OPENSCAD_PATH = (
     "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD"
     if sys.platform == "darwin"
@@ -147,17 +149,26 @@ def with_petal_ring_color(ring: int, obj: s.OpenSCADObject) -> s.OpenSCADObject:
     return s.color((r, g, b))(obj)
 
 
-def generate_petal_base_pins(tolerance: float = 0.0) -> s.OpenSCADObject:
-    pin = s.translate((PETAL_PIN_OFFSET_MM, 0, -3))(
-        s.cylinder(r=PETAL_PIN_BASE_R + tolerance, h=3, segments=100)
+def generate_petal_base_pins(
+    tolerance: float = 0.0, extra_height: float = 0
+) -> s.OpenSCADObject:
+    height = 3 + extra_height
+    pin = s.translate((PETAL_PIN_OFFSET_MM, 0, -(height - 1)))(
+        s.cylinder(r=PETAL_PIN_BASE_R + tolerance, h=height, segments=100)
     )
     return pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
 
 
 def generate_petal_base(tolerance: float = 0.0) -> s.OpenSCADObject:
-    return s.translate((0, 0, -1))(
-        s.cylinder(r=PETAL_BASE_RADIUS, h=2, segments=100)
+    return s.cylinder(
+        r=PETAL_BASE_RADIUS, h=2, segments=100
     ) - generate_petal_base_pins(tolerance)
+
+
+def generate_petal_aligner() -> s.OpenSCADObject:
+    return s.cylinder(r=PETAL_BASE_RADIUS, h=2, segments=100) + s.translate((0, 0, -1))(
+        generate_petal_base_pins(-0.2, PLATE_THICKNESS - 0.25)
+    )
 
 
 def generate_petal(debug: bool) -> s.OpenSCADObject:
@@ -867,6 +878,14 @@ def main():
             generate_flower_assembly(None, generate_petal_base()),
             out_folder,
             "flower-bases",
+        )
+
+        write_3d(
+            write_scad(
+                generate_petal_aligner(),
+                out_folder,
+                "petal-aligner",
+            )
         )
 
         # Backplate
