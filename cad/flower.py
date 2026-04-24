@@ -159,10 +159,8 @@ def generate_petal_base_pins(
     return pin + s.rotate((0, 0, 120))(pin) + s.rotate((0, 0, 240))(pin)
 
 
-def generate_petal_base(tolerance: float = 0.0) -> s.OpenSCADObject:
-    return s.cylinder(
-        r=PETAL_BASE_RADIUS, h=2, segments=100
-    ) - generate_petal_base_pins(tolerance)
+def generate_petal_base() -> s.OpenSCADObject:
+    return s.cylinder(r=PETAL_BASE_RADIUS, h=2, segments=100)
 
 
 def generate_petal_aligner() -> s.OpenSCADObject:
@@ -838,10 +836,13 @@ def main():
 
         # Full assembly
         write_scad(
-            generate_flower_assembly(
-                s.import_(single_petal_3d_path), generate_petal_base()
+            (
+                generate_flower_assembly(
+                    s.import_(single_petal_3d_path), generate_petal_base()
+                )
+                + generate_center(debug)
             )
-            + generate_center(debug),
+            - generate_petal_base_pins(0),
             out_folder,
             "flower-assembly",
         )
@@ -862,10 +863,13 @@ def main():
                 write_scad(
                     with_petal_ring_color(
                         lay.ring,
-                        s.scale((lay.scale, lay.scale, lay.scale))(
-                            generate_petal(debug)
+                        (
+                            s.scale((lay.scale, lay.scale, lay.scale))(
+                                generate_petal(debug)
+                            )
+                            + generate_petal_base()
                         )
-                        + generate_petal_base(),
+                        - generate_petal_base_pins(0),
                     ),
                     out_folder,
                     f"parts/scaled-petal-{lay.ring}",
@@ -875,7 +879,10 @@ def main():
 
         # Flower bases
         write_scad(
-            generate_flower_assembly(None, generate_petal_base()),
+            (
+                generate_flower_assembly(None, generate_petal_base())
+                - generate_petal_base_pins(0)
+            ),
             out_folder,
             "flower-bases",
         )
