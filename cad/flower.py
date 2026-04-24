@@ -156,8 +156,8 @@ def generate_petal_base_pins(tolerance: float = 0.0) -> s.OpenSCADObject:
 
 def generate_petal_base(tolerance: float = 0.0) -> s.OpenSCADObject:
     return s.translate((0, 0, -1))(
-        s.cylinder(r=PETAL_BASE_RADIUS, h=1, segments=100)
-    ) + generate_petal_base_pins(tolerance)
+        s.cylinder(r=PETAL_BASE_RADIUS, h=2, segments=100)
+    ) - generate_petal_base_pins(tolerance)
 
 
 def generate_petal(debug: bool) -> s.OpenSCADObject:
