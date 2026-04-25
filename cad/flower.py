@@ -163,6 +163,14 @@ def generate_petal_base() -> s.OpenSCADObject:
     return s.cylinder(r=PETAL_BASE_RADIUS, h=2, segments=100)
 
 
+def generate_petal_with_base(petal: s.OpenSCADObject) -> s.OpenSCADObject:
+    # Cap the petal opening
+    cap = s.linear_extrude(height=2, convexity=4)(
+        s.hull()(s.projection(cut=True)(s.translate((0, 0, -1))(petal)))
+    )
+    return petal + generate_petal_base() + cap
+
+
 def generate_petal_aligner() -> s.OpenSCADObject:
     return s.cylinder(r=PETAL_BASE_RADIUS, h=2, segments=100) + s.translate((0, 0, -1))(
         generate_petal_base_pins(-0.2, PLATE_THICKNESS - 0.25)
@@ -217,12 +225,6 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
     # Rotate a bit and translate to match
     petal = s.translate((0, 0, 9))(s.rotate((-PETAL_ROTATE, 0, 0))(petal))
 
-    # Cap the petal opening
-    cap = s.linear_extrude(height=2, convexity=4)(
-        s.hull()(s.projection(cut=True)(petal))
-    )
-    petal = petal + cap
-
     # Remove everything below Z=0 (the XZ plane)
     cube = s.translate((0, 0, -50))(s.cube([100, 100, 100], center=True))
 
@@ -230,7 +232,7 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
 
 
 def generate_flower_assembly(
-    flower: Optional[s.OpenSCADObject], base: s.OpenSCADObject
+    petal: Optional[s.OpenSCADObject], base: s.OpenSCADObject
 ) -> s.OpenSCADObject:
     obj = s.union()
     for lay in get_ring_layouts():
@@ -238,9 +240,9 @@ def generate_flower_assembly(
         for i in range(lay.n_petals):
             angle_deg = lay.angle_per_petal * i + stagger
             scaled_obj = base
-            if flower:
-                scaled_obj = scaled_obj + s.scale((lay.scale, lay.scale, lay.scale))(
-                    flower
+            if petal:
+                scaled_obj = generate_petal_with_base(
+                    s.scale((lay.scale, lay.scale, lay.scale))(petal)
                 )
                 scaled_obj = with_petal_ring_color(lay.ring, scaled_obj)
             obj = obj + (
@@ -869,11 +871,10 @@ def main():
                 write_scad(
                     with_petal_ring_color(
                         lay.ring,
-                        (
+                        generate_petal_with_base(
                             s.scale((lay.scale, lay.scale, lay.scale))(
                                 generate_petal(debug)
                             )
-                            + generate_petal_base()
                         )
                         - generate_petal_base_pins(0),
                     ),
