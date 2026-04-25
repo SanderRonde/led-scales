@@ -217,7 +217,13 @@ def generate_petal(debug: bool) -> s.OpenSCADObject:
     # Rotate a bit and translate to match
     petal = s.translate((0, 0, 9))(s.rotate((-PETAL_ROTATE, 0, 0))(petal))
 
-    # Remove the XZ plane
+    # Cap the petal opening
+    cap = s.linear_extrude(height=2, convexity=4)(
+        s.hull()(s.projection(cut=True)(petal))
+    )
+    petal = petal + cap
+
+    # Remove everything below Z=0 (the XZ plane)
     cube = s.translate((0, 0, -50))(s.cube([100, 100, 100], center=True))
 
     return petal - cube
