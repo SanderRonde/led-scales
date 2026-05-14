@@ -123,6 +123,18 @@ export class LEDVisualizerBase {
                 const typedData = data;
                 this.updateLEDsWithData(typedData, scale);
             });
+
+            this.socket.on("state_update", (data) => {
+                window.dispatchEvent(
+                    new CustomEvent("led-state-update", { detail: data })
+                );
+            });
+
+            this.socket.on("presets_update", (presets) => {
+                window.dispatchEvent(
+                    new CustomEvent("led-presets-update", { detail: presets })
+                );
+            });
         } catch (error) {
             console.error("Failed to initialize visualizer:", error);
 

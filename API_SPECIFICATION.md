@@ -186,7 +186,8 @@ Host: localhost:5001
     "power_state": true,
     "target_power_state": true,
     "brightness": 0.85,
-    "active_preset_id": 1697123456789
+    "active_preset_id": 1697123456789,
+    "default_preset_id": 1697123456790
 }
 ```
 
@@ -196,6 +197,7 @@ Host: localhost:5001
 -   `target_power_state` (boolean): Target power state after fade completes
 -   `brightness` (float): Brightness level (0.0 to 1.0)
 -   `active_preset_id` (number|null): ID of the currently active preset, or null if no preset is active
+-   `default_preset_id` (number|null): ID of the preset applied automatically on server startup, or null if none
 
 ---
 
@@ -229,7 +231,8 @@ Content-Type: application/json
     "power_state": true,
     "target_power_state": false,
     "brightness": 0.5,
-    "active_preset_id": null
+    "active_preset_id": null,
+    "default_preset_id": 1697123456790
 }
 ```
 
@@ -411,6 +414,70 @@ Host: localhost:5001
 
 -   Saves configuration to disk
 -   Emits `presets_update` Socket.IO event to all connected clients
+-   If the deleted preset was the startup default, clears `default_preset_id` and emits `state_update`
+
+---
+
+#### POST /presets/default
+
+Set or clear which preset is applied automatically when the LED server starts. This does not change the current effect until the next restart (unless you also call `POST /presets/apply`).
+
+**Request:**
+
+```http
+POST /presets/default HTTP/1.1
+Host: localhost:5001
+Content-Type: application/json
+
+{
+  "id": 1697123456789
+}
+```
+
+**Request Body:**
+
+-   `id` (number|null, required): Preset ID to use on startup, or `null` to clear the default
+
+**Response:** `200 OK`
+
+```json
+{
+    "success": true,
+    "default_preset_id": 1697123456789
+}
+```
+
+When clearing the default:
+
+```json
+{
+    "success": true,
+    "default_preset_id": null
+}
+```
+
+**Error Responses:**
+
+`400 Bad Request` — Missing `id` key
+
+```json
+{
+    "error": "JSON body must include \"id\" (preset id or null to clear)"
+}
+```
+
+`404 Not Found` — Preset id is not in the saved presets list
+
+```json
+{
+    "error": "Preset not found"
+}
+```
+
+**Side Effects:**
+
+-   Saves `default_preset_id` to `~/.led_config.json`
+-   Emits `state_update` Socket.IO event to all connected clients
 
 ---
 
@@ -700,7 +767,7 @@ socket.on("led_update", (data) => {
 
 #### Event: `state_update`
 
-Emitted when power state or brightness changes.
+Emitted when power state, brightness, or startup default preset changes.
 
 **Payload:**
 
@@ -709,7 +776,8 @@ Emitted when power state or brightness changes.
     "power_state": true,
     "target_power_state": false,
     "brightness": 0.75,
-    "active_preset_id": 1697123456789
+    "active_preset_id": 1697123456789,
+    "default_preset_id": 1697123456790
 }
 ```
 
@@ -719,12 +787,15 @@ Emitted when power state or brightness changes.
 -   `target_power_state` (boolean): Target power state (differs during fade)
 -   `brightness` (float): Brightness level (0.0 to 1.0)
 -   `active_preset_id` (number|null): ID of the currently active preset, or null if no preset is active
+-   `default_preset_id` (number|null): ID of the preset applied on server startup, or null if none
 
 **Triggered By:**
 
 -   Client connects
 -   POST /state endpoint called
 -   Preset applied
+-   POST /presets/default called
+-   DELETE /presets/{id} when the removed preset was the startup default
 
 **Client Handler Example:**
 
@@ -734,6 +805,7 @@ socket.on("state_update", (data) => {
         `Power: ${data.power_state}, Brightness: ${data.brightness * 100}%`
     );
     console.log(`Active preset: ${data.active_preset_id || "None"}`);
+    console.log(`Startup default: ${data.default_preset_id || "None"}`);
     updatePowerButton(data.power_state);
     updateBrightnessSlider(data.brightness);
     highlightActivePreset(data.active_preset_id);
@@ -1414,6 +1486,7 @@ All configuration is stored in a single JSON file at `~/.led_config.json`. This 
 -   Power state
 -   Brightness level
 -   Active preset ID
+-   Default preset ID (applied on server startup)
 -   All saved presets
 
 The file is automatically saved whenever:
@@ -1424,6 +1497,7 @@ The file is automatically saved whenever:
 -   Brightness is changed
 -   Presets are created, updated, or deleted
 -   Active preset is changed
+-   Startup default preset is set or cleared
 
 ### Active Preset Tracking
 
@@ -1436,6 +1510,10 @@ The system tracks which preset is currently active via the `active_preset_id` fi
     -   Brightness is changed via `POST /state`
 -   **Persisted**: The active preset ID is saved to `~/.led_config.json` and restored on restart
 -   **Included in state**: The `active_preset_id` is included in all state responses and `state_update` Socket.IO events
+
+### Startup default preset
+
+The `default_preset_id` field (also in `~/.led_config.json`) chooses a saved preset to **apply when the server process starts**, after the last-saved effect is loaded. If the id is missing from presets, refers to an unknown effect, or the field is null, the server keeps the normal saved-effect behavior. Setting the default via `POST /presets/default` does not apply the preset immediately; use `POST /presets/apply` for that.
 
 This allows UI clients to highlight which preset is currently active and automatically clear the highlight when the user makes manual adjustments.
 

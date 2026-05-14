@@ -25,12 +25,61 @@ class PresetManager {
     constructor() {
         this.presets = [];
         this.currentPreset = null;
+        /** @type {number|null} */
+        this.defaultPresetId = null;
         this.presetList = document.getElementById("preset-list");
         this.saveButton = document.getElementById("save-preset");
         this.presetNameInput = document.getElementById("preset-name");
 
+        document.addEventListener("led-state-update", (e) => {
+            const ev = /** @type {CustomEvent} */ (e);
+            this.onServerState(ev.detail);
+        });
+        document.addEventListener("led-presets-update", (e) => {
+            const ev = /** @type {CustomEvent} */ (e);
+            const presets = ev.detail;
+            if (Array.isArray(presets)) {
+                this.presets = presets;
+                this.renderPresets();
+            }
+        });
+
         this.initializeEventListeners();
-        this.loadPresets();
+        this.initialLoad();
+    }
+
+    /**
+     * @param {{ active_preset_id?: number|null, default_preset_id?: number|null }} data
+     */
+    onServerState(data) {
+        if (data.default_preset_id !== undefined) {
+            this.defaultPresetId = data.default_preset_id;
+        }
+        const aid = data.active_preset_id;
+        if (aid != null) {
+            this.currentPreset =
+                this.presets.find((p) => p.id === aid) ?? null;
+        } else {
+            this.currentPreset = null;
+        }
+        this.renderPresets();
+    }
+
+    async initialLoad() {
+        await this.loadPresets();
+        await this.syncStateFromServer();
+    }
+
+    async syncStateFromServer() {
+        try {
+            const response = await fetch("/state");
+            if (response.ok) {
+                const data = await response.json();
+                this.onServerState(data);
+            }
+        } catch (error) {
+            console.error("Error loading state for presets:", error);
+        }
     }
 
     async loadPresets() {
@@ -87,7 +136,6 @@ class PresetManager {
             });
 
             if (response.ok) {
-                const savedPreset = await response.json();
                 await this.loadPresets(); // Reload all presets
                 this.presetNameInput.value = "";
             }
@@ -143,9 +191,33 @@ class PresetManager {
             if (response.ok) {
                 this.currentPreset = preset;
                 this.renderPresets();
+                await this.syncStateFromServer();
             }
         } catch (error) {
             console.error("Error applying preset:", error);
+        }
+    }
+
+    /**
+     * Set or clear which preset loads when the server starts.
+     * @param {Preset} preset
+     */
+    async toggleStartupDefault(preset) {
+        const isDefault = this.defaultPresetId === preset.id;
+        const id = isDefault ? null : preset.id;
+        try {
+            const response = await fetch("/presets/default", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id }),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.defaultPresetId = data.default_preset_id ?? null;
+                this.renderPresets();
+            }
+        } catch (error) {
+            console.error("Error setting startup preset:", error);
         }
     }
 
@@ -160,7 +232,8 @@ class PresetManager {
             });
 
             if (response.ok) {
-                await this.loadPresets(); // Reload all presets
+                await this.loadPresets();
+                await this.syncStateFromServer();
             }
         } catch (error) {
             console.error("Error deleting preset:", error);
@@ -175,14 +248,36 @@ class PresetManager {
         this.presetList.innerHTML = "";
 
         this.presets.forEach((preset) => {
+            const isActive = this.currentPreset?.id === preset.id;
+            const isStartupDefault = this.defaultPresetId === preset.id;
+
             const presetElement = document.createElement("div");
-            presetElement.className = `preset-item ${
-                this.currentPreset?.id === preset.id ? "active" : ""
-            }`;
+            presetElement.className = [
+                "preset-item",
+                isActive ? "active" : "",
+                isStartupDefault ? "startup-default" : "",
+            ]
+                .filter(Boolean)
+                .join(" ");
+
             presetElement.innerHTML = `
-                <span>${preset.name}</span>
+                <div class="preset-main">
+                    <span class="preset-name">${preset.name}</span>
+                    ${
+                        isStartupDefault
+                            ? '<span class="preset-startup-badge" title="This preset runs when the server starts">On startup</span>'
+                            : ""
+                    }
+                </div>
                 <div class="preset-actions">
-                    <button class="delete" data-id="${preset.id}">Delete</button>
+                    <button type="button" class="startup-default-btn ${
+                        isStartupDefault ? "is-on" : ""
+                    }" data-id="${preset.id}" title="${
+                isStartupDefault
+                    ? "Clear startup preset"
+                    : "Use this preset when the server starts"
+            }">★</button>
+                    <button type="button" class="delete" data-id="${preset.id}">Delete</button>
                 </div>
             `;
 
@@ -194,6 +289,12 @@ class PresetManager {
             deleteButton.addEventListener("click", (e) => {
                 e.stopPropagation();
                 this.deletePreset(preset.id);
+            });
+
+            const startupBtn = presetElement.querySelector(".startup-default-btn");
+            startupBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.toggleStartupDefault(preset);
             });
 
             this.presetList.appendChild(presetElement);

@@ -58,11 +58,13 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 8px;
             padding: 8px;
             margin: 4px 0;
             background: var(--background);
             border-radius: 4px;
             cursor: pointer;
+            border: 1px solid transparent;
         }
 
         .preset-item:hover {
@@ -73,14 +75,84 @@
             background: var(--primary);
         }
 
+        .preset-item.startup-default {
+            border-color: rgba(255, 193, 7, 0.55);
+            box-shadow: inset 3px 0 0 0 #ffc107;
+        }
+
+        .preset-item.active.startup-default {
+            border-color: rgba(255, 235, 160, 0.7);
+            box-shadow: inset 3px 0 0 0 #ffeb3b;
+        }
+
+        .preset-main {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .preset-name {
+            font-weight: 500;
+        }
+
+        .preset-startup-badge {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #1a1a1a;
+            background: #ffc107;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .preset-item.active .preset-startup-badge {
+            color: #333;
+            background: #ffeb3b;
+        }
+
+        .preset-hint {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
         .preset-actions {
             display: flex;
             gap: 4px;
+            flex-shrink: 0;
         }
 
         .preset-actions button {
             padding: 4px 8px;
             font-size: 12px;
+            margin: 0;
+        }
+
+        .preset-actions .startup-default-btn {
+            min-width: 32px;
+            background: #555;
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .preset-actions .startup-default-btn:hover {
+            background: #666;
+            color: #fff;
+        }
+
+        .preset-actions .startup-default-btn.is-on {
+            background: #b8860b;
+            color: #fff;
+        }
+
+        .preset-actions .startup-default-btn.is-on:hover {
+            background: #daa520;
         }
 
         .preset-actions .delete {
@@ -270,6 +342,7 @@
         </div>
         <div class="presets-panel">
             <h2>Presets</h2>
+            <p class="preset-hint">★ marks the preset that loads when the server starts. Click the row to apply now.</p>
             <div class="preset-name-input">
                 <input type="text" id="preset-name" placeholder="Preset name">
                 <button id="save-preset" class="save">Save Current</button>

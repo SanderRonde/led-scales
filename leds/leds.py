@@ -6,7 +6,7 @@ import time
 import threading
 import logging
 import json
-from typing import Dict, Any, Union
+from typing import Any, Dict, Optional, Union
 from pathlib import Path
 from flask import (  # pylint: disable=import-error
     Flask,
@@ -90,6 +90,54 @@ class LEDs:
         else:
             self._effect = self.set_effect(RainbowRadialEffect.__name__)
 
+        self._apply_default_preset_on_startup()
+
+    def _apply_preset_payload(self, data: Dict[str, Any]) -> bool:
+        """Apply effect, brightness, and parameters from a preset-style dict."""
+        effect_name = data.get("effect")
+        if not effect_name or effect_name not in self._effects:
+            return False
+
+        self._effect = self._effects[effect_name]
+        if "parameters" in data and data["parameters"] is not None:
+            for param_name, param_value in data["parameters"].items():
+                if hasattr(self._effect.PARAMETERS, param_name):
+                    getattr(self._effect.PARAMETERS, param_name).set_value(param_value)
+
+        if "brightness" in data and data["brightness"] is not None:
+            self._brightness = float(data["brightness"])
+
+        self._active_preset_id = data.get("id", None)
+
+        self._running = True
+        self._save_config()
+        self._emit_effects_update()
+        self._emit_state_update()
+        return True
+
+    def _apply_default_preset_on_startup(self) -> None:
+        """If a default preset id is configured and valid, apply it (overrides last effect)."""
+        default_id: Optional[int] = self._config_data.get("default_preset_id")
+        if default_id is None:
+            return
+        presets = self._config_data.get("presets", [])
+        preset = next((p for p in presets if p["id"] == default_id), None)
+        if preset is None:
+            self._config_data["default_preset_id"] = None
+            self._save_config()
+            return
+        ok = self._apply_preset_payload(
+            {
+                "id": preset["id"],
+                "effect": preset["effect"],
+                "brightness": preset.get("brightness", self._brightness),
+                "parameters": preset.get("parameters", {}),
+            }
+        )
+        if not ok:
+            self._config_data["default_preset_id"] = None
+            self._save_config()
+
     def _get_sleep_time(self) -> float:
         if self._controller.is_mock:
             return SLEEP_TIME_MOCK
@@ -131,6 +179,7 @@ class LEDs:
                 "target_power_state": self._target_power_state,
                 "brightness": self._brightness,
                 "active_preset_id": self._active_preset_id,
+                "default_preset_id": self._config_data.get("default_preset_id"),
             },
             namespace="/",
         )
@@ -223,9 +272,41 @@ class LEDs:
         def delete_preset(preset_id: int):  # type: ignore  # pylint: disable=unused-variable
             presets = self._config_data.get("presets", [])
             self._config_data["presets"] = [p for p in presets if p["id"] != preset_id]
+            if self._config_data.get("default_preset_id") == preset_id:
+                self._config_data["default_preset_id"] = None
             self._save_config()
             self._emit_presets_update()
+            self._emit_state_update()
             return jsonify({"success": True})
+
+        @self._app.route("/presets/default", methods=["POST"])
+        def set_default_preset():  # type: ignore  # pylint: disable=unused-variable
+            data = request.get_json()
+            if data is None or "id" not in data:
+                return (
+                    jsonify(
+                        {
+                            "error": 'JSON body must include "id" (preset id or null to clear)',
+                        }
+                    ),
+                    400,
+                )
+
+            preset_id = data["id"]
+            if preset_id is None:
+                self._config_data["default_preset_id"] = None
+                self._save_config()
+                self._emit_state_update()
+                return jsonify({"success": True, "default_preset_id": None})
+
+            presets = self._config_data.get("presets", [])
+            if not any(p["id"] == preset_id for p in presets):
+                return jsonify({"error": "Preset not found"}), 404
+
+            self._config_data["default_preset_id"] = preset_id
+            self._save_config()
+            self._emit_state_update()
+            return jsonify({"success": True, "default_preset_id": preset_id})
 
         @self._app.route("/presets/apply", methods=["POST"])
         def apply_preset():  # type: ignore  # pylint: disable=unused-variable
@@ -233,26 +314,8 @@ class LEDs:
             if not data:
                 return jsonify({"error": "No preset data provided"}), 400
 
-            # Set effect and parameters
-            self._effect = self._effects[data["effect"]]
-            if "parameters" in data:
-                for param_name, param_value in data["parameters"].items():
-                    if hasattr(self._effect.PARAMETERS, param_name):
-                        getattr(self._effect.PARAMETERS, param_name).set_value(
-                            param_value
-                        )
-
-            # Set brightness
-            if "brightness" in data:
-                self._brightness = data["brightness"]
-
-            # Set active preset ID
-            self._active_preset_id = data.get("id", None)
-
-            self._running = True
-            self._save_config()
-            self._emit_effects_update()
-            self._emit_state_update()
+            if not self._apply_preset_payload(data):
+                return jsonify({"error": "Invalid preset data"}), 400
             return jsonify({"success": True})
 
         @self._app.route("/effects")
@@ -335,6 +398,7 @@ class LEDs:
                     "target_power_state": self._target_power_state,
                     "brightness": self._brightness,
                     "active_preset_id": self._active_preset_id,
+                    "default_preset_id": self._config_data.get("default_preset_id"),
                 }
             )
 
@@ -346,6 +410,7 @@ class LEDs:
                     "target_power_state": self._target_power_state,
                     "brightness": self._brightness,
                     "active_preset_id": self._active_preset_id,
+                    "default_preset_id": self._config_data.get("default_preset_id"),
                 }
             )
 
