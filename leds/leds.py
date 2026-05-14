@@ -76,12 +76,13 @@ class LEDs:
 
         # Load all configuration from a single file
         self._config_data = self._load_config()
-        self._power_state = self._config_data.get("power_state", True)
+        startup_power = self._effective_power_on_at_startup()
+        self._power_state = startup_power
         self._brightness = self._config_data.get("brightness", 1.0)
         self._active_preset_id = self._config_data.get("active_preset_id", None)
         self._fade_start_time = 0
         self._fade_duration = 300  # ms
-        self._target_power_state = self._power_state
+        self._target_power_state = startup_power
 
         # Try to load saved effect, fall back to RainbowRadialEffect if none exists
         saved_effect = self._config_data.get("effect_name")
@@ -91,6 +92,12 @@ class LEDs:
             self._effect = self.set_effect(RainbowRadialEffect.__name__)
 
         self._apply_default_preset_on_startup()
+
+    def _effective_power_on_at_startup(self) -> bool:
+        """Whether LEDs should start on after a server restart."""
+        if "power_on_at_startup" in self._config_data:
+            return bool(self._config_data["power_on_at_startup"])
+        return bool(self._config_data.get("power_state", True))
 
     def _apply_preset_payload(self, data: Dict[str, Any]) -> bool:
         """Apply effect, brightness, and parameters from a preset-style dict."""
@@ -180,6 +187,7 @@ class LEDs:
                 "brightness": self._brightness,
                 "active_preset_id": self._active_preset_id,
                 "default_preset_id": self._config_data.get("default_preset_id"),
+                "power_on_at_startup": self._effective_power_on_at_startup(),
             },
             namespace="/",
         )
@@ -372,6 +380,31 @@ class LEDs:
         def get_visualizer_config():  # type: ignore  # pylint: disable=unused-variable
             return jsonify(self._controller.get_visualizer_config())
 
+        @self._app.route("/state/startup-power", methods=["POST"])
+        def set_startup_power():  # type: ignore  # pylint: disable=unused-variable
+            data = request.get_json()
+            if data is None or "power_on_at_startup" not in data:
+                return (
+                    jsonify(
+                        {
+                            "error": 'JSON body must include "power_on_at_startup" (boolean)',
+                        }
+                    ),
+                    400,
+                )
+            val = data["power_on_at_startup"]
+            if not isinstance(val, bool):
+                return (
+                    jsonify(
+                        {"error": '"power_on_at_startup" must be a boolean'},
+                    ),
+                    400,
+                )
+            self._config_data["power_on_at_startup"] = val
+            self._save_config()
+            self._emit_state_update()
+            return jsonify({"success": True, "power_on_at_startup": val})
+
         @self._app.route("/state", methods=["POST"])
         def set_state():  # type: ignore  # pylint: disable=unused-variable
             data: Dict[str, Any] = request.get_json() or {}
@@ -399,6 +432,7 @@ class LEDs:
                     "brightness": self._brightness,
                     "active_preset_id": self._active_preset_id,
                     "default_preset_id": self._config_data.get("default_preset_id"),
+                    "power_on_at_startup": self._effective_power_on_at_startup(),
                 }
             )
 
@@ -411,6 +445,7 @@ class LEDs:
                     "brightness": self._brightness,
                     "active_preset_id": self._active_preset_id,
                     "default_preset_id": self._config_data.get("default_preset_id"),
+                    "power_on_at_startup": self._effective_power_on_at_startup(),
                 }
             )
 

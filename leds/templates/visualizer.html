@@ -247,6 +247,35 @@
             background: var(--primary-dark);
         }
 
+        .startup-power-row {
+            margin: 0 0 16px 0;
+            padding: 10px 12px;
+            background: var(--background);
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.35;
+        }
+
+        .startup-power-row label {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .startup-power-row input[type="checkbox"] {
+            width: auto;
+            min-width: 18px;
+            margin: 2px 0 0 0;
+            flex-shrink: 0;
+        }
+
+        .startup-power-row strong {
+            color: var(--text);
+        }
+
         .parameter-group {
             margin: 16px 0;
             padding: 12px;
@@ -324,6 +353,12 @@
         <div class="control-panel">
             <h2>LED Control</h2>
             <button id="power-button" class="power-button">Power Off</button>
+            <div class="startup-power-row">
+                <label>
+                    <input type="checkbox" id="startup-power-on" checked>
+                    <span><strong>Power on at startup</strong> — when the LED server starts, turn strips on (unchecked = start off).</span>
+                </label>
+            </div>
             <div class="parameter-group">
                 <label for="brightness-slider">Brightness</label>
                 <div class="range-input">

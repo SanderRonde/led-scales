@@ -3,6 +3,7 @@ const effectSelect = document.getElementById("effect-select");
 const parametersDiv = document.getElementById("parameters");
 const applyButton = document.getElementById("apply-effect");
 const powerButton = document.getElementById("power-button");
+const startupPowerCheckbox = document.getElementById("startup-power-on");
 const brightnessSlider = document.getElementById("brightness-slider");
 const brightnessValue = brightnessSlider.nextElementSibling;
 
@@ -357,16 +358,56 @@ export async function applyEffect() {
  * Initializes the brightness slider and power button
  */
 async function initializeControls() {
+    document.addEventListener("led-state-update", (e) => {
+        const ev = /** @type {CustomEvent} */ (e);
+        const d = ev.detail;
+        if (d.brightness !== undefined) {
+            updateBrightnessSliderState(d.brightness);
+        }
+        if (d.power_state !== undefined) {
+            updatePowerButtonState(d.power_state);
+        }
+        if (d.power_on_at_startup !== undefined && startupPowerCheckbox) {
+            startupPowerCheckbox.checked = d.power_on_at_startup;
+        }
+    });
+
     try {
         const response = await fetch("/state");
-        const { brightness, power_state } = await response.json();
+        const { brightness, power_state, power_on_at_startup } =
+            await response.json();
 
         updateBrightnessSliderState(brightness);
 
         // Initialize power button
         updatePowerButtonState(power_state);
+
+        if (startupPowerCheckbox && power_on_at_startup !== undefined) {
+            startupPowerCheckbox.checked = power_on_at_startup;
+        }
     } catch (error) {
         console.error("Failed to fetch state:", error);
+    }
+
+    if (startupPowerCheckbox) {
+        startupPowerCheckbox.addEventListener("change", async () => {
+            const next = startupPowerCheckbox.checked;
+            try {
+                const response = await fetch("/state/startup-power", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ power_on_at_startup: next }),
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                console.error("Failed to set startup power:", error);
+                startupPowerCheckbox.checked = !next;
+            }
+        });
     }
 
     // Brightness slider event listeners

@@ -187,7 +187,8 @@ Host: localhost:5001
     "target_power_state": true,
     "brightness": 0.85,
     "active_preset_id": 1697123456789,
-    "default_preset_id": 1697123456790
+    "default_preset_id": 1697123456790,
+    "power_on_at_startup": true
 }
 ```
 
@@ -198,6 +199,53 @@ Host: localhost:5001
 -   `brightness` (float): Brightness level (0.0 to 1.0)
 -   `active_preset_id` (number|null): ID of the currently active preset, or null if no preset is active
 -   `default_preset_id` (number|null): ID of the preset applied automatically on server startup, or null if none
+-   `power_on_at_startup` (boolean): Whether the server begins with strips powered on after a restart (see `POST /state/startup-power`). If the key is absent from disk config, this matches legacy behavior using the last saved `power_state`.
+
+---
+
+#### POST /state/startup-power
+
+Set whether LEDs should **start powered on** when the LED server process starts (persisted; does not change current power until the next restart).
+
+**Request:**
+
+```http
+POST /state/startup-power HTTP/1.1
+Host: localhost:5001
+Content-Type: application/json
+
+{
+  "power_on_at_startup": false
+}
+```
+
+**Request Body:**
+
+-   `power_on_at_startup` (boolean, required): `true` to start on after each server boot, `false` to start off
+
+**Response:** `200 OK`
+
+```json
+{
+    "success": true,
+    "power_on_at_startup": false
+}
+```
+
+**Error Responses:**
+
+`400 Bad Request` — Missing or non-boolean field
+
+```json
+{
+    "error": "JSON body must include \"power_on_at_startup\" (boolean)"
+}
+```
+
+**Side Effects:**
+
+-   Saves `power_on_at_startup` to `~/.led_config.json`
+-   Emits `state_update` Socket.IO event to all connected clients
 
 ---
 
@@ -232,7 +280,8 @@ Content-Type: application/json
     "target_power_state": false,
     "brightness": 0.5,
     "active_preset_id": null,
-    "default_preset_id": 1697123456790
+    "default_preset_id": 1697123456790,
+    "power_on_at_startup": true
 }
 ```
 
@@ -767,7 +816,7 @@ socket.on("led_update", (data) => {
 
 #### Event: `state_update`
 
-Emitted when power state, brightness, or startup default preset changes.
+Emitted when power state, brightness, startup default preset, or startup power preference changes.
 
 **Payload:**
 
@@ -777,7 +826,8 @@ Emitted when power state, brightness, or startup default preset changes.
     "target_power_state": false,
     "brightness": 0.75,
     "active_preset_id": 1697123456789,
-    "default_preset_id": 1697123456790
+    "default_preset_id": 1697123456790,
+    "power_on_at_startup": true
 }
 ```
 
@@ -788,6 +838,7 @@ Emitted when power state, brightness, or startup default preset changes.
 -   `brightness` (float): Brightness level (0.0 to 1.0)
 -   `active_preset_id` (number|null): ID of the currently active preset, or null if no preset is active
 -   `default_preset_id` (number|null): ID of the preset applied on server startup, or null if none
+-   `power_on_at_startup` (boolean): Whether the server will start with power on after the next restart
 
 **Triggered By:**
 
@@ -796,6 +847,7 @@ Emitted when power state, brightness, or startup default preset changes.
 -   Preset applied
 -   POST /presets/default called
 -   DELETE /presets/{id} when the removed preset was the startup default
+-   POST /state/startup-power called
 
 **Client Handler Example:**
 
@@ -806,6 +858,7 @@ socket.on("state_update", (data) => {
     );
     console.log(`Active preset: ${data.active_preset_id || "None"}`);
     console.log(`Startup default: ${data.default_preset_id || "None"}`);
+    console.log(`Power on at next startup: ${data.power_on_at_startup}`);
     updatePowerButton(data.power_state);
     updateBrightnessSlider(data.brightness);
     highlightActivePreset(data.active_preset_id);
@@ -1487,6 +1540,7 @@ All configuration is stored in a single JSON file at `~/.led_config.json`. This 
 -   Brightness level
 -   Active preset ID
 -   Default preset ID (applied on server startup)
+-   `power_on_at_startup` (whether strips start on after a server restart)
 -   All saved presets
 
 The file is automatically saved whenever:
@@ -1498,6 +1552,7 @@ The file is automatically saved whenever:
 -   Presets are created, updated, or deleted
 -   Active preset is changed
 -   Startup default preset is set or cleared
+-   Startup power preference is changed (`POST /state/startup-power`)
 
 ### Active Preset Tracking
 
@@ -1511,11 +1566,15 @@ The system tracks which preset is currently active via the `active_preset_id` fi
 -   **Persisted**: The active preset ID is saved to `~/.led_config.json` and restored on restart
 -   **Included in state**: The `active_preset_id` is included in all state responses and `state_update` Socket.IO events
 
+This allows UI clients to highlight which preset is currently active and automatically clear the highlight when the user makes manual adjustments.
+
 ### Startup default preset
 
 The `default_preset_id` field (also in `~/.led_config.json`) chooses a saved preset to **apply when the server process starts**, after the last-saved effect is loaded. If the id is missing from presets, refers to an unknown effect, or the field is null, the server keeps the normal saved-effect behavior. Setting the default via `POST /presets/default` does not apply the preset immediately; use `POST /presets/apply` for that.
 
-This allows UI clients to highlight which preset is currently active and automatically clear the highlight when the user makes manual adjustments.
+### Power on at startup
+
+The `power_on_at_startup` boolean (in `~/.led_config.json`) sets **initial power** when the server starts. It is independent of the live `power_state` saved during operation (so you can turn lights off before shutdown without changing the next-boot preference until you change this setting). If `power_on_at_startup` has never been written, the server uses the legacy rule: initial power matches the last saved `power_state`.
 
 ### Fade Transition
 
