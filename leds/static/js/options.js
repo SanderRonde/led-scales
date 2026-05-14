@@ -393,7 +393,7 @@ async function initializeControls() {
         startupPowerCheckbox.addEventListener("change", async () => {
             const next = startupPowerCheckbox.checked;
             try {
-                const response = await fetch("/state/startup-power", {
+                const response = await fetch("/state", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

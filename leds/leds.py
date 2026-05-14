@@ -380,34 +380,20 @@ class LEDs:
         def get_visualizer_config():  # type: ignore  # pylint: disable=unused-variable
             return jsonify(self._controller.get_visualizer_config())
 
-        @self._app.route("/state/startup-power", methods=["POST"])
-        def set_startup_power():  # type: ignore  # pylint: disable=unused-variable
-            data = request.get_json()
-            if data is None or "power_on_at_startup" not in data:
-                return (
-                    jsonify(
-                        {
-                            "error": 'JSON body must include "power_on_at_startup" (boolean)',
-                        }
-                    ),
-                    400,
-                )
-            val = data["power_on_at_startup"]
-            if not isinstance(val, bool):
-                return (
-                    jsonify(
-                        {"error": '"power_on_at_startup" must be a boolean'},
-                    ),
-                    400,
-                )
-            self._config_data["power_on_at_startup"] = val
-            self._save_config()
-            self._emit_state_update()
-            return jsonify({"success": True, "power_on_at_startup": val})
-
         @self._app.route("/state", methods=["POST"])
         def set_state():  # type: ignore  # pylint: disable=unused-variable
             data: Dict[str, Any] = request.get_json() or {}
+
+            if "power_on_at_startup" in data:
+                val = data["power_on_at_startup"]
+                if not isinstance(val, bool):
+                    return (
+                        jsonify(
+                            {"error": '"power_on_at_startup" must be a boolean'},
+                        ),
+                        400,
+                    )
+                self._config_data["power_on_at_startup"] = val
 
             # Handle power state
             if "power_state" in data:

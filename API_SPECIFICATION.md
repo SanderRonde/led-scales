@@ -199,59 +199,13 @@ Host: localhost:5001
 -   `brightness` (float): Brightness level (0.0 to 1.0)
 -   `active_preset_id` (number|null): ID of the currently active preset, or null if no preset is active
 -   `default_preset_id` (number|null): ID of the preset applied automatically on server startup, or null if none
--   `power_on_at_startup` (boolean): Whether the server begins with strips powered on after a restart (see `POST /state/startup-power`). If the key is absent from disk config, this matches legacy behavior using the last saved `power_state`.
-
----
-
-#### POST /state/startup-power
-
-Set whether LEDs should **start powered on** when the LED server process starts (persisted; does not change current power until the next restart).
-
-**Request:**
-
-```http
-POST /state/startup-power HTTP/1.1
-Host: localhost:5001
-Content-Type: application/json
-
-{
-  "power_on_at_startup": false
-}
-```
-
-**Request Body:**
-
--   `power_on_at_startup` (boolean, required): `true` to start on after each server boot, `false` to start off
-
-**Response:** `200 OK`
-
-```json
-{
-    "success": true,
-    "power_on_at_startup": false
-}
-```
-
-**Error Responses:**
-
-`400 Bad Request` — Missing or non-boolean field
-
-```json
-{
-    "error": "JSON body must include \"power_on_at_startup\" (boolean)"
-}
-```
-
-**Side Effects:**
-
--   Saves `power_on_at_startup` to `~/.led_config.json`
--   Emits `state_update` Socket.IO event to all connected clients
+-   `power_on_at_startup` (boolean): Whether the server begins with strips powered on after a restart. If the key is absent from disk config, this matches legacy behavior using the last saved `power_state`. Change it with `POST /state` (optional body field).
 
 ---
 
 #### POST /state
 
-Update the power state and/or brightness.
+Update the power state, brightness, and/or startup power preference.
 
 **Request:**
 
@@ -266,10 +220,23 @@ Content-Type: application/json
 }
 ```
 
+**Request (startup preference only):**
+
+```http
+POST /state HTTP/1.1
+Host: localhost:5001
+Content-Type: application/json
+
+{
+  "power_on_at_startup": false
+}
+```
+
 **Request Body:**
 
 -   `power_state` (boolean, optional): Set the target power state
 -   `brightness` (float, optional): Set the brightness (0.0 to 1.0)
+-   `power_on_at_startup` (boolean, optional): Persist whether strips should start **on** after the next server restart (`false` = start off). Does not change current power unless `power_state` is also sent.
 
 **Response:** `200 OK`
 
@@ -290,10 +257,22 @@ Content-Type: application/json
 -   Power state changes trigger a 300ms fade transition
 -   During the fade, `power_state` and `target_power_state` will differ
 -   Brightness is clamped to range [0.0, 1.0]
+-   If `power_on_at_startup` is present but not a JSON boolean, the server returns `400 Bad Request`
+
+**Error Responses:**
+
+`400 Bad Request` — `power_on_at_startup` is not a boolean
+
+```json
+{
+    "error": "\"power_on_at_startup\" must be a boolean"
+}
+```
 
 **Side Effects:**
 
 -   Saves configuration to disk
+-   Persists `power_on_at_startup` when that field is included in the request body
 -   Starts fade transition for power changes
 -   Clears `active_preset_id` when brightness is modified
 -   Emits `state_update` Socket.IO event to all connected clients
@@ -843,11 +822,10 @@ Emitted when power state, brightness, startup default preset, or startup power p
 **Triggered By:**
 
 -   Client connects
--   POST /state endpoint called
+-   `POST /state` (power, brightness, and/or `power_on_at_startup`)
 -   Preset applied
--   POST /presets/default called
--   DELETE /presets/{id} when the removed preset was the startup default
--   POST /state/startup-power called
+-   `POST /presets/default`
+-   `DELETE /presets/{id}` when the removed preset was the startup default
 
 **Client Handler Example:**
 
@@ -1552,7 +1530,7 @@ The file is automatically saved whenever:
 -   Presets are created, updated, or deleted
 -   Active preset is changed
 -   Startup default preset is set or cleared
--   Startup power preference is changed (`POST /state/startup-power`)
+-   Startup power preference is changed via `POST /state` (`power_on_at_startup` field)
 
 ### Active Preset Tracking
 
