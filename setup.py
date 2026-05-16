@@ -30,6 +30,7 @@ PACKAGE_CONFIG: Dict[str, Any] = {
             "watchdog",  # Required for development mode
             "Flask-SocketIO",  # Required for real-time updates
             "python-socketio",  # Required for real-time updates
+            "python-engineio>=4.8.0",  # Fixes ping-timeout race on emit
         ],
         "cad": [
             "pylint",

@@ -68,6 +68,8 @@ class LEDs:
         self._init_routes()
         self._effects = get_effects(self._controller)
         self._running = False
+        self._ws_client_lock = threading.Lock()
+        self._ws_client_count = 0
 
         # FPS tracking variables
         self._frame_count = 0
@@ -177,9 +179,25 @@ class LEDs:
         except (json.JSONDecodeError, KeyError):
             return {"power_state": True}
 
+    def _has_ws_clients(self) -> bool:
+        with self._ws_client_lock:
+            return self._ws_client_count > 0
+
+    def _safe_emit(self, event: str, data: Any) -> None:
+        """Emit to WebSocket clients, skipping when none are connected."""
+        if not self._has_ws_clients():
+            return
+        try:
+            self._socketio.emit(event, data, namespace="/")  # type: ignore
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Stale/disconnecting clients can race engineio ping handling.
+            logging.getLogger(__name__).debug(
+                "WebSocket emit failed for %s", event, exc_info=True
+            )
+
     def _emit_state_update(self) -> None:
         """Emit current state through WebSocket"""
-        self._socketio.emit(  # type: ignore
+        self._safe_emit(
             "state_update",
             {
                 "power_state": self._power_state,
@@ -189,13 +207,12 @@ class LEDs:
                 "default_preset_id": self._config_data.get("default_preset_id"),
                 "power_on_at_startup": self._effective_power_on_at_startup(),
             },
-            namespace="/",
         )
 
     def _emit_effects_update(self) -> None:
         """Emit current effects through WebSocket"""
         effect_parameters = get_all_effects_parameters(self._effects)
-        self._socketio.emit(  # type: ignore
+        self._safe_emit(
             "effects_update",
             {
                 "effect_parameters": effect_parameters,
@@ -205,17 +222,12 @@ class LEDs:
                 },
                 "current_effect": self._effect.__class__.__name__,
             },
-            namespace="/",
         )
 
     def _emit_presets_update(self) -> None:
         """Emit current presets through WebSocket"""
         presets = self._config_data.get("presets", [])
-        self._socketio.emit(  # type: ignore
-            "presets_update",
-            presets,
-            namespace="/",
-        )
+        self._safe_emit("presets_update", presets)
 
     def _init_routes(self) -> None:
         @self._app.route("/")
@@ -438,9 +450,16 @@ class LEDs:
         @self._socketio.on("connect")
         def handle_connect():  # type: ignore  # pylint: disable=unused-variable
             """Emit full state when a client connects"""
+            with self._ws_client_lock:
+                self._ws_client_count += 1
             self._emit_state_update()
             self._emit_effects_update()
             self._emit_presets_update()
+
+        @self._socketio.on("disconnect")
+        def handle_disconnect():  # type: ignore  # pylint: disable=unused-variable
+            with self._ws_client_lock:
+                self._ws_client_count = max(0, self._ws_client_count - 1)
 
     def listen(self) -> None:
         """Start the web server in the main thread"""
@@ -498,10 +517,9 @@ class LEDs:
                     self._controller.set_color(RGBW(0, 0, 0, 0))
                     self._controller.show()
 
-                # Emit LED data through WebSocket
-                self._socketio.emit(  # type: ignore
-                    "led_update", self._controller.json(), namespace="/"
-                )
+                # Emit LED data through WebSocket (skip when no visualizer is open)
+                if self._has_ws_clients():
+                    self._safe_emit("led_update", self._controller.json())
 
                 # FPS tracking and debug output
                 if self._debug:
