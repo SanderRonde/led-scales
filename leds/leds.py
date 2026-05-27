@@ -6,6 +6,7 @@ import time
 import threading
 import logging
 import json
+import uuid
 from typing import Any, Dict, Optional, Union
 from pathlib import Path
 from flask import (  # pylint: disable=import-error
@@ -94,6 +95,7 @@ class LEDs:
             self._effect = self.set_effect(RainbowRadialEffect.__name__)
 
         self._apply_default_preset_on_startup()
+        self._device_id = f"{uuid.getnode():012x}"
 
     def _effective_power_on_at_startup(self) -> bool:
         """Whether LEDs should start on after a server restart."""
@@ -200,6 +202,7 @@ class LEDs:
         self._safe_emit(
             "state_update",
             {
+                "device_id": self._device_id,
                 "power_state": self._power_state,
                 "target_power_state": self._target_power_state,
                 "brightness": self._brightness,
@@ -425,6 +428,7 @@ class LEDs:
             return jsonify(
                 {
                     "success": True,
+                    "device_id": self._device_id,
                     "power_state": self._power_state,
                     "target_power_state": self._target_power_state,
                     "brightness": self._brightness,
@@ -438,6 +442,7 @@ class LEDs:
         def get_state():  # type: ignore  # pylint: disable=unused-variable
             return jsonify(
                 {
+                    "device_id": self._device_id,
                     "power_state": self._power_state,
                     "target_power_state": self._target_power_state,
                     "brightness": self._brightness,
