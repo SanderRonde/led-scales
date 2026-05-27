@@ -79,6 +79,7 @@ class LEDs:
 
         # Load all configuration from a single file
         self._config_data = self._load_config()
+        self._device_id = f"{uuid.getnode():012x}"
         startup_power = self._effective_power_on_at_startup()
         self._power_state = startup_power
         self._brightness = self._config_data.get("brightness", 1.0)
@@ -95,7 +96,6 @@ class LEDs:
             self._effect = self.set_effect(RainbowRadialEffect.__name__)
 
         self._apply_default_preset_on_startup()
-        self._device_id = f"{uuid.getnode():012x}"
 
     def _effective_power_on_at_startup(self) -> bool:
         """Whether LEDs should start on after a server restart."""
