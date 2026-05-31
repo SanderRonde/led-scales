@@ -152,7 +152,7 @@ def with_petal_ring_color(ring: int, obj: s.OpenSCADObject) -> s.OpenSCADObject:
 def generate_petal_base_pins(
     tolerance: float = 0.0, extra_height: float = 0
 ) -> s.OpenSCADObject:
-    height = 3 + extra_height
+    height = 1 + extra_height
     pin = s.translate((PETAL_PIN_OFFSET_MM, 0, -(height - 1)))(
         s.cylinder(r=PETAL_PIN_BASE_R + tolerance, h=height, segments=100)
     )
@@ -514,7 +514,7 @@ def generate_backplate() -> s.OpenSCADObject:
 
     # Holes for petals
     plate = plate - generate_flower_assembly(
-        None, s.projection(True)(generate_petal_base_pins(TOLERANCE))
+        None, s.projection(True)(generate_petal_base_pins(TOLERANCE, 3))
     )
 
     # Center hole
@@ -583,7 +583,7 @@ def print_flower_layout() -> None:
 def fix_import(scad: str) -> str:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     std = os.path.abspath(os.path.join(root, "BOSL2", "std.scad"))
-    file_header = f'include <{std.replace(os.sep, "/")}>\n'
+    file_header = f"include <{std.replace(os.sep, '/')}>\n"
 
     scad = file_header + scad
     scad = re.sub(
@@ -849,8 +849,7 @@ def main():
                     s.import_(single_petal_3d_path), generate_petal_base()
                 )
                 + generate_center(debug)
-            )
-            - generate_petal_base_pins(0),
+            ),
             out_folder,
             "flower-assembly",
         )
